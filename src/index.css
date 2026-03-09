@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --color-lilac-50: #faf9ff;
+  --color-lilac-100: #f5f3ff;
+  --color-lilac-200: #ede9fe;
+  --color-lilac-300: #ddd6fe;
+  --color-lilac-400: #c4b5fd;
+  --color-lilac-500: #a78bfa;
+  --color-lilac-600: #8b5cf6;
+  --color-lilac-700: #7c3aed;
+  --color-lilac-800: #6d28d9;
+  --color-lilac-900: #5b21b6;
+  
+  --color-rose-50: #fffafb;
+  --color-rose-100: #fff1f3;
+  --color-rose-200: #ffe4e8;
+  --color-rose-300: #fecdd6;
+  
+  --font-serif: "Playfair Display", "Georgia", serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-lilac-50 text-slate-800 font-sans;
+  }
+}
+
+@layer components {
+  .parchment-bg {
+    background-color: #fcf8f0;
+    background-image: url("https://www.transparenttextures.com/patterns/paper-fibers.png");
+    box-shadow: inset 0 0 100px rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.1);
+  }
+  
+  .sidebar-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer hover:bg-rose-100 text-slate-600 hover:text-lilac-700;
+  }
+  
+  .sidebar-item.active {
+    @apply bg-rose-200 text-lilac-700 font-medium;
+  }
+}
