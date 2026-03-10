@@ -97,8 +97,8 @@ export default function App() {
   return (
 <div className="flex flex-col md:flex-row min-h-screen bg-lilac-50 overflow-hidden">
           {/* Sidebar */}
-<aside className="w-full md:w-64 flex-shrink-0 bg-rose-50 border-b md:border-r border-lilac-100 flex flex-col py-6 shadow-sm">
-            <Logo />
+<aside className="hidden md:flex md:w-64 flex-shrink-0 bg-rose-50 border-r border-lilac-100 flex-col py-6 shadow-sm">
+              <Logo />
         <nav className="flex-1 px-3 space-y-1">
           <SidebarItem 
             icon={<Plus size={20} />} 
@@ -143,8 +143,8 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-<main className="flex-1 overflow-y-auto relative w-full">
-          <AnimatePresence mode="wait">
+<main className="flex-1 w-full overflow-y-auto relative">
+            <AnimatePresence mode="wait">
           <motion.div
             key={currentView}
             initial={{ opacity: 0, y: 10 }}
