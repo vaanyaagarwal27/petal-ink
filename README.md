@@ -5,7 +5,7 @@
 🔗 https://petal-ink-two.vercel.app
 
 ## What it does
-- **AI Theme Generator** — answers 5-6 questions about your style and mood, then suggests themes, metaphors, and literary devices (not the poem itself — your words stay yours)
+- **AI Theme Generator** — answer 5-6 questions about your style and mood, then get suggestion about themes, metaphors, and literary devices (not the poem itself — your words stay yours)
 - **Rhyming Dictionary** — type any word, get perfect rhymes, near rhymes, and slant rhymes instantly
 - **Writing Insights** — tracks your most-used themes and vocabulary across all your saved poems
 - **Poetry Library** — curated poems from famous writers for inspiration
