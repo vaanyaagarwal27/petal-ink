@@ -12,7 +12,7 @@
 - **Save & Revisit** — all your poems saved, accessible from the sidebar
 
 ## Built with
-- Google AI Studio (Gemini API)
+- Gemini API
 - React + TypeScript + Vite
 - Deployed on Vercel
 - Responsive — works on mobile and desktop
