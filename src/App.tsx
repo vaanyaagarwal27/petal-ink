@@ -948,90 +948,44 @@ interface AnnotationResult {
   vocabSuggestions: Array<{ original: string; suggestions: string[]; line: string }>;
 }
 
+// Renders a line with optional circled phrases. Circles only show when the line
+// has an annotation note (showCircles=true); otherwise the phrase is plain text.
 function renderAnnotatedLine(
   lineText: string,
-  lineIdx: number,
   circledPhrases: string[],
-  vocabSuggestions: AnnotationResult['vocabSuggestions'],
-  hoveredVocab: string | null,
-  setHoveredVocab: (v: string | null) => void
+  showCircles: boolean
 ): React.ReactNode {
+  if (!showCircles || circledPhrases.length === 0) return lineText;
+
   const lowerLine = lineText.toLowerCase();
-
-  interface Mark {
-    start: number;
-    end: number;
-    type: 'circle' | 'vocab';
-    suggestions?: string[];
-  }
-
-  const marks: Mark[] = [];
+  const marks: Array<{ start: number; end: number }> = [];
 
   for (const phrase of circledPhrases) {
     const idx = lowerLine.indexOf(phrase.toLowerCase());
-    if (idx !== -1) {
-      marks.push({ start: idx, end: idx + phrase.length, type: 'circle' });
-    }
+    if (idx !== -1) marks.push({ start: idx, end: idx + phrase.length });
   }
 
-  for (const v of vocabSuggestions) {
-    const idx = lowerLine.indexOf(v.original.toLowerCase());
-    if (idx === -1) continue;
-    const overlaps = marks.some(m => idx < m.end && idx + v.original.length > m.start);
-    if (!overlaps) {
-      marks.push({ start: idx, end: idx + v.original.length, type: 'vocab', suggestions: v.suggestions });
-    }
-  }
-
+  if (marks.length === 0) return lineText;
   marks.sort((a, b) => a.start - b.start);
 
   const nodes: React.ReactNode[] = [];
   let pos = 0;
-
   for (const mark of marks) {
     if (mark.start > pos) nodes.push(lineText.slice(pos, mark.start));
-    const marked = lineText.slice(mark.start, mark.end);
-    const hoverKey = `${lineIdx}-${mark.start}`;
-
-    if (mark.type === 'circle') {
-      nodes.push(
-        <span key={hoverKey} style={{
-          border: '2px solid #b87355',
-          borderRadius: '50% 45% 55% 48%',
-          padding: '2px 8px',
-          display: 'inline',
-        }}>
-          {marked}
-        </span>
-      );
-    } else {
-      nodes.push(
-        <span
-          key={hoverKey}
-          className="relative cursor-help"
-          style={{ borderBottom: '1px dotted #9c9080' }}
-          onMouseEnter={() => setHoveredVocab(hoverKey)}
-          onMouseLeave={() => setHoveredVocab(null)}
-        >
-          {marked}
-          {hoveredVocab === hoverKey && (
-            <span
-              className="absolute bottom-full left-0 mb-1 flex gap-2 whitespace-nowrap z-10 rounded-lg px-3 py-2 text-xs shadow-md"
-              style={{ background: '#fdfaf6', border: '1px solid #ede7d9' }}
-            >
-              {mark.suggestions?.map(s => (
-                <span key={s} style={{ color: '#b87355' }}>{s}</span>
-              ))}
-            </span>
-          )}
-        </span>
-      );
-    }
+    nodes.push(
+      <span key={mark.start} style={{
+        border: '2px solid #b87355',
+        borderRadius: '50% 45% 55% 48%',
+        padding: '2px 8px',
+        display: 'inline',
+      }}>
+        {lineText.slice(mark.start, mark.end)}
+      </span>
+    );
     pos = mark.end;
   }
-
   if (pos < lineText.length) nodes.push(lineText.slice(pos));
-  return nodes.length > 0 ? <>{nodes}</> : lineText;
+  return <>{nodes}</>;
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {
@@ -1070,7 +1024,6 @@ function WritingInsightsView({ poems }: { poems: Poem[] }) {
   const [selectedPoemId, setSelectedPoemId] = useState(poems[0]?.id || '');
   const [analysisResult, setAnalysisResult] = useState<AnnotationResult | null>(null);
   const [analysing, setAnalysing] = useState(false);
-  const [hoveredVocab, setHoveredVocab] = useState<string | null>(null);
 
   const totalPoems = poems.length;
   const uniqueThemes = Object.keys(themes).length;
@@ -1121,6 +1074,11 @@ ${poem.content}`,
   // Annotation result view
   if (readMode === 'result' && analysisResult) {
     const poem = poems.find(p => p.id === selectedPoemId)!;
+    // Track which annotation lines have already been shown (deduplication for repeated lines)
+    const usedAnnotationLines = new Set<string>();
+    // Track which vocab suggestion lines have already been shown
+    const usedVocabLines = new Set<string>();
+
     return (
       <div className="p-8 max-w-4xl mx-auto">
         <button
@@ -1143,56 +1101,55 @@ ${poem.content}`,
           className="rounded-2xl p-8 md:p-12 mb-8"
           style={{ background: '#fdfaf6', border: '1px solid #ede7d9' }}
         >
-          <div>
-            {poem.content.split('\n').map((line, lineIdx) => {
-              if (!line.trim()) return <div key={lineIdx} className="h-3" />;
+          {poem.content.split('\n').map((line, lineIdx) => {
+            if (!line.trim()) return <div key={lineIdx} className="h-3" />;
+            const trimmedLine = line.trim();
 
-              const annotation = analysisResult.annotations.find(a =>
-                a.line.trim() === line.trim() ||
-                line.trim().toLowerCase().includes(a.line.trim().toLowerCase())
-              );
+            // Find annotation — only first occurrence of each annotated line
+            const annotation = analysisResult.annotations.find(a => {
+              const key = a.line.trim();
+              if (usedAnnotationLines.has(key)) return false;
+              return key === trimmedLine || trimmedLine.toLowerCase().includes(key.toLowerCase());
+            });
+            if (annotation) usedAnnotationLines.add(annotation.line.trim());
 
-              const textDecoStyle: React.CSSProperties = annotation?.type === 'praise'
-                ? { textDecoration: 'underline', textDecorationColor: '#7a9e7a', textDecorationStyle: 'solid' as const, textUnderlineOffset: '3px' }
-                : annotation?.type === 'improve'
-                ? { textDecoration: 'underline', textDecorationColor: '#b87355', textDecorationStyle: 'dashed' as const, textUnderlineOffset: '3px' }
-                : {};
+            // Find vocab suggestion — only first occurrence
+            const vocab = analysisResult.vocabSuggestions.find(v => {
+              const key = v.line.trim();
+              if (usedVocabLines.has(key)) return false;
+              return key === trimmedLine || trimmedLine.toLowerCase().includes(v.original.toLowerCase());
+            });
+            if (vocab) usedVocabLines.add(vocab.line.trim());
 
-              return (
-                <div key={lineIdx} className="mb-1.5">
-                  <div className="flex items-baseline gap-3">
-                    <span
-                      className="flex-1 font-serif text-base leading-relaxed"
-                      style={{ color: '#2e3d30', ...textDecoStyle }}
-                    >
-                      {renderAnnotatedLine(
-                        line, lineIdx,
-                        analysisResult.circledPhrases,
-                        analysisResult.vocabSuggestions,
-                        hoveredVocab,
-                        setHoveredVocab
-                      )}
-                    </span>
-                    <span className="w-5 flex-shrink-0 text-right text-sm select-none">
-                      {annotation?.type === 'praise' && <span style={{ color: '#b87355' }}>✦</span>}
-                      {annotation?.type === 'improve' && <span style={{ color: '#7a9e7a' }}>→</span>}
-                    </span>
-                  </div>
-                  {annotation && (
-                    <p style={{
-                      fontStyle: 'italic',
-                      color: '#6b7f6e',
-                      fontSize: '13px',
-                      marginLeft: '1rem',
-                      marginTop: '4px',
-                    }}>
-                      {annotation.note}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+            const hasNote = !!annotation;
+
+            const textDecoStyle: React.CSSProperties = annotation?.type === 'praise'
+              ? { textDecoration: 'underline', textDecorationColor: '#7a9e7a', textDecorationStyle: 'solid' as const, textUnderlineOffset: '3px' }
+              : annotation?.type === 'improve'
+              ? { textDecoration: 'underline', textDecorationColor: '#b87355', textDecorationStyle: 'dashed' as const, textUnderlineOffset: '3px' }
+              : {};
+
+            return (
+              <div key={lineIdx} className="mb-1.5">
+                <span
+                  className="font-serif text-base leading-relaxed"
+                  style={{ color: '#2e3d30', ...textDecoStyle }}
+                >
+                  {renderAnnotatedLine(line, analysisResult.circledPhrases, hasNote)}
+                </span>
+                {annotation && (
+                  <p style={{ fontStyle: 'italic', color: '#6b7f6e', fontSize: '13px', marginLeft: '1rem', marginTop: '4px' }}>
+                    {annotation.note}
+                  </p>
+                )}
+                {vocab && (
+                  <p style={{ fontStyle: 'italic', color: '#6b7f6e', fontSize: '13px', marginLeft: '1rem', marginTop: '4px' }}>
+                    &lsquo;{vocab.original}&rsquo; → try: {vocab.suggestions.join(', ')}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Editor's letter */}
@@ -1200,10 +1157,7 @@ ${poem.content}`,
           className="rounded-xl p-6"
           style={{ background: '#fdf8f0', borderLeft: '4px solid #b87355' }}
         >
-          <p
-            className="text-xs uppercase tracking-widest font-bold mb-3"
-            style={{ color: '#9c9080' }}
-          >
+          <p className="text-xs uppercase tracking-widest font-bold mb-3" style={{ color: '#9c9080' }}>
             Editor's Note
           </p>
           <p
@@ -1217,57 +1171,80 @@ ${poem.content}`,
     );
   }
 
+  const sectionLabel: React.CSSProperties = {
+    fontFamily: 'system-ui',
+    fontSize: '11px',
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color: '#9c9080',
+    marginBottom: '20px',
+    display: 'block',
+  };
+
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-8 max-w-3xl mx-auto">
       <h2 className="text-3xl font-serif text-lilac-800 mb-8">Writing Insights</h2>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-3 gap-4 mb-12">
         <StatCard label="Total poems" value={String(totalPoems)} />
         <StatCard label="Unique themes" value={String(uniqueThemes)} />
         <StatCard label="Most used word" value={mostUsedWord} />
       </div>
 
-      {/* Themes + Vocab */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-        <div className="rounded-2xl p-8 shadow-sm border border-lilac-200" style={{ background: '#fdfaf6' }}>
-          <h3 className="text-xl font-serif text-slate-800 mb-6">Common Themes</h3>
-          <div className="space-y-4">
-            {sortedThemes.length > 0 ? sortedThemes.map(([theme, count]) => (
+      {/* your themes */}
+      <section className="mb-12">
+        <span style={sectionLabel}>your themes</span>
+        {sortedThemes.length > 0 ? (
+          <div className="space-y-5">
+            {sortedThemes.map(([theme, count]) => (
               <div key={theme}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-slate-600">{theme}</span>
-                  <span className="text-lilac-600 font-bold">{count}</span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-serif text-base" style={{ color: '#2e3d30' }}>{theme}</span>
+                  <span className="text-sm" style={{ color: '#9c9080' }}>{count}</span>
                 </div>
-                <div className="h-2 bg-lilac-100 rounded-full overflow-hidden">
+                <div className="h-1.5 rounded-full" style={{ background: '#ede7d9' }}>
                   <div
-                    className="h-full bg-lilac-600"
-                    style={{ width: `${(count / poems.length) * 100}%` }}
+                    className="h-full rounded-full transition-all"
+                    style={{ background: '#b87355', width: `${(count / poems.length) * 100}%` }}
                   />
                 </div>
+                <p style={{ fontStyle: 'italic', fontSize: '12px', color: '#9c9080', marginTop: '4px' }}>
+                  {count === 1 ? 'written once' : count === 2 ? 'returning to this' : 'this keeps finding you'}
+                </p>
               </div>
-            )) : <p className="text-slate-400 italic">Write more to see theme trends.</p>}
+            ))}
           </div>
-        </div>
+        ) : (
+          <p className="text-slate-400 italic text-sm">Write more to see theme patterns.</p>
+        )}
+      </section>
 
-        <div className="rounded-2xl p-8 shadow-sm border border-lilac-200" style={{ background: '#fdfaf6' }}>
-          <h3 className="text-xl font-serif text-slate-800 mb-6">Vocabulary Echoes</h3>
-          <div className="flex flex-wrap gap-3">
-            {topWords.length > 0 ? topWords.map(([word, count]) => (
-              <div key={word} className="flex items-center gap-2 px-4 py-2 bg-lilac-50 rounded-full border border-lilac-200">
-                <span className="text-lilac-800 font-medium">{word}</span>
-                <span className="text-xs text-lilac-400">{count}</span>
-              </div>
-            )) : <p className="text-slate-400 italic">Vocabulary analysis will appear here.</p>}
+      {/* words you can't escape */}
+      <section className="mb-12">
+        <span style={sectionLabel}>words you can&rsquo;t escape</span>
+        {topWords.length > 0 ? (
+          <div className="flex flex-wrap" style={{ gap: '12px' }}>
+            {topWords.map(([word], i) => (
+              <span
+                key={word}
+                className={cn('font-serif', i < 3 ? 'text-2xl' : i < 7 ? 'text-lg' : 'text-base')}
+                style={{ color: i < 3 ? '#2e3d30' : i < 7 ? '#6b7f6e' : '#9c9080' }}
+              >
+                {word}
+              </span>
+            ))}
           </div>
-        </div>
-      </div>
+        ) : (
+          <p className="text-slate-400 italic text-sm">Vocabulary patterns will appear here.</p>
+        )}
+      </section>
 
       {/* Read my writing */}
       {readMode === 'hidden' && poems.length > 0 && (
         <button
           onClick={() => setReadMode('select')}
-          className="px-6 py-2.5 rounded-full text-sm font-medium transition-all hover:text-white"
+          className="px-6 py-2.5 rounded-full text-sm font-medium transition-all"
           style={{ color: '#b87355', border: '1px solid #b87355' }}
           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#b87355'; (e.currentTarget as HTMLButtonElement).style.color = 'white'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#b87355'; }}
