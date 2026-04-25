@@ -939,6 +939,112 @@ function RhymeSection({ title, words }: { title: string, words: string[] }) {
   );
 }
 
+// --- Writing Insights helpers ---
+
+interface AnnotationResult {
+  editorLetter: string;
+  circledPhrases: string[];
+  annotations: Array<{ line: string; note: string; type: 'praise' | 'improve' }>;
+  vocabSuggestions: Array<{ original: string; suggestions: string[]; line: string }>;
+}
+
+function renderAnnotatedLine(
+  lineText: string,
+  lineIdx: number,
+  circledPhrases: string[],
+  vocabSuggestions: AnnotationResult['vocabSuggestions'],
+  hoveredVocab: string | null,
+  setHoveredVocab: (v: string | null) => void
+): React.ReactNode {
+  const lowerLine = lineText.toLowerCase();
+
+  interface Mark {
+    start: number;
+    end: number;
+    type: 'circle' | 'vocab';
+    suggestions?: string[];
+  }
+
+  const marks: Mark[] = [];
+
+  for (const phrase of circledPhrases) {
+    const idx = lowerLine.indexOf(phrase.toLowerCase());
+    if (idx !== -1) {
+      marks.push({ start: idx, end: idx + phrase.length, type: 'circle' });
+    }
+  }
+
+  for (const v of vocabSuggestions) {
+    const idx = lowerLine.indexOf(v.original.toLowerCase());
+    if (idx === -1) continue;
+    const overlaps = marks.some(m => idx < m.end && idx + v.original.length > m.start);
+    if (!overlaps) {
+      marks.push({ start: idx, end: idx + v.original.length, type: 'vocab', suggestions: v.suggestions });
+    }
+  }
+
+  marks.sort((a, b) => a.start - b.start);
+
+  const nodes: React.ReactNode[] = [];
+  let pos = 0;
+
+  for (const mark of marks) {
+    if (mark.start > pos) nodes.push(lineText.slice(pos, mark.start));
+    const marked = lineText.slice(mark.start, mark.end);
+    const hoverKey = `${lineIdx}-${mark.start}`;
+
+    if (mark.type === 'circle') {
+      nodes.push(
+        <span key={hoverKey} style={{
+          border: '2px solid #b87355',
+          borderRadius: '50% 45% 55% 48%',
+          padding: '2px 8px',
+          display: 'inline',
+        }}>
+          {marked}
+        </span>
+      );
+    } else {
+      nodes.push(
+        <span
+          key={hoverKey}
+          className="relative cursor-help"
+          style={{ borderBottom: '1px dotted #9c9080' }}
+          onMouseEnter={() => setHoveredVocab(hoverKey)}
+          onMouseLeave={() => setHoveredVocab(null)}
+        >
+          {marked}
+          {hoveredVocab === hoverKey && (
+            <span
+              className="absolute bottom-full left-0 mb-1 flex gap-2 whitespace-nowrap z-10 rounded-lg px-3 py-2 text-xs shadow-md"
+              style={{ background: '#fdfaf6', border: '1px solid #ede7d9' }}
+            >
+              {mark.suggestions?.map(s => (
+                <span key={s} style={{ color: '#b87355' }}>{s}</span>
+              ))}
+            </span>
+          )}
+        </span>
+      );
+    }
+    pos = mark.end;
+  }
+
+  if (pos < lineText.length) nodes.push(lineText.slice(pos));
+  return nodes.length > 0 ? <>{nodes}</> : lineText;
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ background: '#fdfaf6', border: '1px solid #ede7d9', borderRadius: '12px', padding: '1rem 1.5rem' }}>
+      <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9c9080', marginBottom: '6px' }}>
+        {label}
+      </p>
+      <p className="text-3xl font-serif" style={{ color: '#2e3d30' }}>{value}</p>
+    </div>
+  );
+}
+
 function WritingInsightsView({ poems }: { poems: Poem[] }) {
   const themes = poems.reduce((acc: Record<string, number>, p) => {
     const t = p.theme || 'Unthemed';
@@ -960,12 +1066,171 @@ function WritingInsightsView({ poems }: { poems: Poem[] }) {
 
   const topWords = Object.entries(wordFreq).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
+  const [readMode, setReadMode] = useState<'hidden' | 'select' | 'result'>('hidden');
+  const [selectedPoemId, setSelectedPoemId] = useState(poems[0]?.id || '');
+  const [analysisResult, setAnalysisResult] = useState<AnnotationResult | null>(null);
+  const [analysing, setAnalysing] = useState(false);
+  const [hoveredVocab, setHoveredVocab] = useState<string | null>(null);
+
+  const totalPoems = poems.length;
+  const uniqueThemes = Object.keys(themes).length;
+  const mostUsedWord = topWords[0]?.[0] || '—';
+
+  const analysePoem = async () => {
+    const poem = poems.find(p => p.id === selectedPoemId);
+    if (!poem) return;
+    setAnalysing(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `You are a senior editor at a prestigious literary publishing house with deep knowledge of poetry craft — metaphor, imagery, sonic texture, emotional arc, line breaks, diction, and form. You will be given a poem. Analyse it with genuine literary rigour.
+
+Return ONLY valid JSON with this structure:
+{
+  "editorLetter": "2-3 sentence overall assessment, honest and specific, like a real editor's letter",
+  "circledPhrases": ["phrase1", "phrase2", "phrase3"],
+  "annotations": [
+    { "line": "exact line from poem", "note": "specific suggestion or observation", "type": "improve" },
+    { "line": "exact line from poem", "note": "what makes this work literarily", "type": "praise" }
+  ],
+  "vocabSuggestions": [
+    { "original": "weak word", "suggestions": ["stronger1", "stronger2", "stronger3"], "line": "exact line containing it" }
+  ]
+}
+
+circledPhrases: 2-4 phrases you genuinely think are the strongest in the poem — specific, not generic praise.
+annotations: 4-6 total. Mix of praise and specific improvement suggestions. Be honest. Reference craft terms.
+vocabSuggestions: 2-3 words that could be stronger. Only suggest if genuinely warranted.
+
+Poem title: ${poem.title || 'Untitled'}
+
+${poem.content}`,
+        config: { responseMimeType: "application/json" }
+      });
+      const data = JSON.parse(response.text || '{}');
+      setAnalysisResult(data);
+      setReadMode('result');
+    } catch (error) {
+      console.error("AI Error:", error);
+    } finally {
+      setAnalysing(false);
+    }
+  };
+
+  // Annotation result view
+  if (readMode === 'result' && analysisResult) {
+    const poem = poems.find(p => p.id === selectedPoemId)!;
+    return (
+      <div className="p-8 max-w-4xl mx-auto">
+        <button
+          onClick={() => setReadMode('hidden')}
+          className="mb-8 transition-colors hover:underline"
+          style={{ color: '#9c9080', fontSize: '14px' }}
+        >
+          ← Back to Insights
+        </button>
+
+        <h2 className="text-2xl font-serif mb-1" style={{ color: '#2e3d30' }}>
+          {poem.title || 'Untitled'}
+        </h2>
+        {poem.theme && (
+          <p className="text-sm italic mb-8" style={{ color: '#9c9080' }}>#{poem.theme}</p>
+        )}
+
+        {/* Annotated poem body */}
+        <div
+          className="rounded-2xl p-8 md:p-12 mb-8"
+          style={{ background: '#fdfaf6', border: '1px solid #ede7d9' }}
+        >
+          <div>
+            {poem.content.split('\n').map((line, lineIdx) => {
+              if (!line.trim()) return <div key={lineIdx} className="h-3" />;
+
+              const annotation = analysisResult.annotations.find(a =>
+                a.line.trim() === line.trim() ||
+                line.trim().toLowerCase().includes(a.line.trim().toLowerCase())
+              );
+
+              const textDecoStyle: React.CSSProperties = annotation?.type === 'praise'
+                ? { textDecoration: 'underline', textDecorationColor: '#7a9e7a', textDecorationStyle: 'solid' as const, textUnderlineOffset: '3px' }
+                : annotation?.type === 'improve'
+                ? { textDecoration: 'underline', textDecorationColor: '#b87355', textDecorationStyle: 'dashed' as const, textUnderlineOffset: '3px' }
+                : {};
+
+              return (
+                <div key={lineIdx} className="mb-1.5">
+                  <div className="flex items-baseline gap-3">
+                    <span
+                      className="flex-1 font-serif text-base leading-relaxed"
+                      style={{ color: '#2e3d30', ...textDecoStyle }}
+                    >
+                      {renderAnnotatedLine(
+                        line, lineIdx,
+                        analysisResult.circledPhrases,
+                        analysisResult.vocabSuggestions,
+                        hoveredVocab,
+                        setHoveredVocab
+                      )}
+                    </span>
+                    <span className="w-5 flex-shrink-0 text-right text-sm select-none">
+                      {annotation?.type === 'praise' && <span style={{ color: '#b87355' }}>✦</span>}
+                      {annotation?.type === 'improve' && <span style={{ color: '#7a9e7a' }}>→</span>}
+                    </span>
+                  </div>
+                  {annotation && (
+                    <p style={{
+                      fontStyle: 'italic',
+                      color: '#6b7f6e',
+                      fontSize: '13px',
+                      marginLeft: '1rem',
+                      marginTop: '4px',
+                    }}>
+                      {annotation.note}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Editor's letter */}
+        <div
+          className="rounded-xl p-6"
+          style={{ background: '#fdf8f0', borderLeft: '4px solid #b87355' }}
+        >
+          <p
+            className="text-xs uppercase tracking-widest font-bold mb-3"
+            style={{ color: '#9c9080' }}
+          >
+            Editor's Note
+          </p>
+          <p
+            className="italic leading-relaxed"
+            style={{ fontFamily: 'Georgia, serif', color: '#2e3d30', fontSize: '15px' }}
+          >
+            {analysisResult.editorLetter}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <h2 className="text-3xl font-serif text-lilac-800 mb-8">Writing Insights</h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="bg-white rounded-2xl p-8 shadow-sm border border-lilac-200">
+      {/* Stat cards */}
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        <StatCard label="Total poems" value={String(totalPoems)} />
+        <StatCard label="Unique themes" value={String(uniqueThemes)} />
+        <StatCard label="Most used word" value={mostUsedWord} />
+      </div>
+
+      {/* Themes + Vocab */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        <div className="rounded-2xl p-8 shadow-sm border border-lilac-200" style={{ background: '#fdfaf6' }}>
           <h3 className="text-xl font-serif text-slate-800 mb-6">Common Themes</h3>
           <div className="space-y-4">
             {sortedThemes.length > 0 ? sortedThemes.map(([theme, count]) => (
@@ -985,7 +1250,7 @@ function WritingInsightsView({ poems }: { poems: Poem[] }) {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-8 shadow-sm border border-lilac-200">
+        <div className="rounded-2xl p-8 shadow-sm border border-lilac-200" style={{ background: '#fdfaf6' }}>
           <h3 className="text-xl font-serif text-slate-800 mb-6">Vocabulary Echoes</h3>
           <div className="flex flex-wrap gap-3">
             {topWords.length > 0 ? topWords.map(([word, count]) => (
@@ -997,6 +1262,52 @@ function WritingInsightsView({ poems }: { poems: Poem[] }) {
           </div>
         </div>
       </div>
+
+      {/* Read my writing */}
+      {readMode === 'hidden' && poems.length > 0 && (
+        <button
+          onClick={() => setReadMode('select')}
+          className="px-6 py-2.5 rounded-full text-sm font-medium transition-all hover:text-white"
+          style={{ color: '#b87355', border: '1px solid #b87355' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#b87355'; (e.currentTarget as HTMLButtonElement).style.color = 'white'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#b87355'; }}
+        >
+          Read my writing →
+        </button>
+      )}
+
+      {readMode === 'select' && (
+        <div
+          className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-6 rounded-2xl"
+          style={{ background: '#fdfaf6', border: '1px solid #ede7d9' }}
+        >
+          <select
+            value={selectedPoemId}
+            onChange={e => setSelectedPoemId(e.target.value)}
+            className="flex-1 p-3 rounded-xl border border-lilac-200 focus:outline-none focus:ring-2 focus:ring-lilac-200 bg-white text-slate-700"
+          >
+            {poems.map(p => (
+              <option key={p.id} value={p.id}>{p.title || 'Untitled'}</option>
+            ))}
+          </select>
+          <div className="flex gap-3">
+            <button
+              onClick={analysePoem}
+              disabled={analysing || !selectedPoemId}
+              className="px-6 py-2.5 rounded-full text-white text-sm font-medium shadow-sm transition-opacity hover:opacity-90 disabled:opacity-40"
+              style={{ background: '#b87355' }}
+            >
+              {analysing ? 'Reading...' : 'Analyse →'}
+            </button>
+            <button
+              onClick={() => setReadMode('hidden')}
+              className="px-4 py-2.5 rounded-full text-sm border border-lilac-200 text-lilac-400 hover:bg-lilac-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
