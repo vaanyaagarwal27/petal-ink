@@ -24,7 +24,6 @@ import { twMerge } from 'tailwind-merge';
 import { GoogleGenAI } from "@google/genai";
 
 import { Poem, View, ThemeGeneration, LibraryPoem } from './types';
-import { PUBLIC_DOMAIN_POEMS } from './constants';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -745,10 +744,203 @@ function PoetryLibraryView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<string>('All');
   const [selectedPoem, setSelectedPoem] = useState<LibraryPoem | null>(null);
+  const [poems, setPoems] = useState<LibraryPoem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredPoems = PUBLIC_DOMAIN_POEMS.filter(p => {
-    const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         p.author.toLowerCase().includes(searchTerm.toLowerCase());
+  const CATEGORY_AUTHORS: Record<string, string[]> = {
+  Romantic: [
+    'John Keats', 'Percy Bysshe Shelley', 'Lord Byron',
+    'Elizabeth Barrett Browning', 'Samuel Taylor Coleridge',
+    'Christina Rossetti', 'Dante Gabriel Rossetti'
+  ],
+  Nature: [
+    'William Wordsworth', 'Robert Frost', 'Walt Whitman',
+    'Gerard Manley Hopkins', 'Robinson Jeffers'
+  ],
+  Classic: [
+    'Edgar Allan Poe', 'Emily Dickinson', 'William Shakespeare',
+    'Alfred Lord Tennyson', 'Thomas Hardy', 'Oliver Wendell Holmes',
+    'Sylvia Plath', 'Anne Sexton', 'Allen Ginsberg'
+  ],
+  Narrative: [
+    'Henry Wadsworth Longfellow', 'Robert Browning',
+    'Alfred Noyes', 'Oscar Wilde'
+  ],
+};
+const INDIAN_POEMS: LibraryPoem[] = [
+  {
+    id: 'indian-1',
+    title: 'Where The Mind Is Without Fear',
+    author: 'Rabindranath Tagore',
+    content: `Where the mind is without fear and the head is held high
+Where knowledge is free
+Where the world has not been broken up into fragments
+By narrow domestic walls
+Where words come out from the depth of truth
+Where tireless striving stretches its arms towards perfection
+Where the clear stream of reason has not lost its way
+Into the dreary desert sand of dead habit
+Where the mind is led forward by thee
+Into ever-widening thought and action
+Into that heaven of freedom, my Father, let my country awake.`,
+    description: 'A prayer for a free, enlightened nation by Nobel laureate Rabindranath Tagore.',
+    category: 'Indian',
+    themeBreakdown: 'Themes of freedom, reason, and national awakening. Written during British colonial rule of India.'
+  },
+  {
+    id: 'indian-2',
+    title: 'The Gift of India',
+    author: 'Sarojini Naidu',
+    content: `Is there ought you need that my hands withhold,
+Rich gifts of raiment or grain or gold?
+Lo! I have flung to the East and West
+Priceless treasures torn from my breast,
+And yielded the sons of my stricken womb
+To the drum-beats of duty, the sabres of doom.
+
+Gathered like pearls in their alien graves
+Silent they sleep by the Persian waves,
+Scattered like shells on Egyptian sands,
+They lie with pale brows and cold, still hands,
+They mingle the dust of Flanders and France
+With the sweet, strong scent of the jungle plants.`,
+    description: 'A powerful poem by Sarojini Naidu about India\'s sacrifice during World War I.',
+    category: 'Indian',
+    themeBreakdown: 'Themes of sacrifice, motherhood, and national pride. India personified as a mother grieving her fallen soldiers.'
+  },
+  {
+    id: 'indian-3',
+    title: 'An Introduction',
+    author: 'Kamala Das',
+    content: `I don't know politics but I know the names
+Of those in power, and can repeat them like
+Days of week, or names of months, beginning with
+Nehru. I am Indian, very brown, born in
+Malabar, I speak three languages, write in
+Two, dream in one. Don't write in English, they said,
+English is not your mother-tongue. Why not leave
+Me alone, critics, friends, visiting cousins,
+Every one of you? Why not let me speak in
+Any language I like?`,
+    description: 'Kamala Das\'s fierce declaration of identity, language, and womanhood.',
+    category: 'Indian',
+    themeBreakdown: 'Themes of identity, feminism, and the politics of language in post-colonial India.'
+  },
+  {
+    id: 'indian-4',
+    title: 'Agneepath',
+    author: 'Harivansh Rai Bachchan',
+    content: `वृक्ष हों भले खड़े,
+हों घने, हों बड़े,
+एक पत्र छाँह भी,
+माँग मत, माँग मत, माँग मत,
+अग्निपथ, अग्निपथ, अग्निपथ।
+
+तू न थकेगा कभी,
+तू न रुकेगा कभी,
+तू न मुड़ेगा कभी,
+कर शपथ, कर शपथ, कर शपथ,
+अग्निपथ, अग्निपथ, अग्निपथ।`,
+    description: 'One of the most iconic Hindi poems, a call to walk the path of fire without fear.',
+    category: 'Hindi',
+    themeBreakdown: 'Themes of perseverance, courage, and relentless pursuit of one\'s path despite hardship.'
+  },
+  {
+    id: 'indian-5',
+    title: 'Madhushala',
+    author: 'Harivansh Rai Bachchan',
+    content: `मृदु भावों के अंगूरों की आज बना लाया हाला,
+प्रियतम, अपने ही हाथों से आज पिलाऊँगा प्याला,
+पहले भोग लगा लूँ तेरा फिर प्रसाद जग पाएगा,
+सबसे पहले तेरा स्वागत करती मेरी मधुशाला।`,
+    description: 'An excerpt from the legendary Madhushala — a metaphorical tavern representing life\'s journey.',
+    category: 'Hindi',
+    themeBreakdown: 'Uses the metaphor of wine and a tavern to explore love, life, spirituality and the human condition.'
+  },
+  {
+    id: 'indian-6',
+    title: 'Rashmirathi',
+    author: 'Ramdhari Singh Dinkar',
+    content: `जब तक मनुज जाति में तेज रहे,
+संसार में कुछ उद्देश्य रहे,
+जब तक जगत में सत्य रहे,
+कर्ण की गाथा अमर रहे।`,
+    description: 'From Rashmirathi, Dinkar\'s epic retelling of Karna\'s story from the Mahabharata.',
+    category: 'Hindi',
+    themeBreakdown: 'Themes of heroism, injustice, and the tragedy of a noble soul born into the wrong circumstances.'
+  },
+  {
+    id: 'indian-7',
+    title: 'Desh Bhakti',
+    author: 'Subhadra Kumari Chauhan',
+    content: `खूब लड़ी मर्दानी वह तो झाँसी वाली रानी थी।
+सिंहासन हिल उठे राजवंशों ने भृकुटी तानी थी,
+बूढ़े भारत में आई फिर से नयी जवानी थी,
+गुमी हुई आज़ादी की कीमत सबने पहचानी थी,
+दूर फिरंगी को करने की सबने मन में ठानी थी।`,
+    description: 'The iconic poem about Rani Lakshmibai of Jhansi, a symbol of Indian resistance.',
+    category: 'Hindi',
+    themeBreakdown: 'Themes of patriotism, bravery, and women\'s power. Celebrates the warrior queen who fought against British rule.'
+  },
+  {
+    id: 'indian-8',
+    title: 'Kabir Ke Dohe',
+    author: 'Kabir',
+    content: `दुख में सुमिरन सब करे, सुख में करे न कोय।
+जो सुख में सुमिरन करे, दुख काहे को होय॥
+
+बुरा जो देखन मैं चला, बुरा न मिलिया कोय।
+जो दिल खोजा आपना, मुझसे बुरा न कोय॥
+
+माटी कहे कुम्हार से, तू क्या रौंदे मोय।
+एक दिन ऐसा आएगा, मैं रौंदूंगी तोय॥`,
+    description: 'Timeless dohas by the mystic poet Kabir, full of wisdom about life and the human condition.',
+    category: 'Hindi',
+    themeBreakdown: 'Themes of self-reflection, humility, and the futility of ego. Kabir uses simple language to deliver profound spiritual truths.'
+  },
+];
+
+  useEffect(() => {
+    async function fetchPoems() {
+  setLoading(true);
+  setPoems(INDIAN_POEMS);
+  const fetchAuthor = async (category: string, author: string) => {
+    try {
+      const res = await fetch(
+        `https://poetrydb.org/author/${encodeURIComponent(author)}/title,author,lines`
+      );
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const newPoems = data.slice(0, 10).map((p: any, i: number) => ({
+          id: `${category}-${author}-${i}`,
+          title: p.title,
+          author: p.author,
+          content: p.lines.join('\n'),
+          description: `A poem by ${p.author}.`,
+          category,
+          themeBreakdown: '',
+        }));
+setPoems(prev => {
+  const withoutDupes = prev.filter(p => !p.id.startsWith('indian-'));
+  return [...INDIAN_POEMS, ...withoutDupes, ...newPoems];
+});      }
+    } catch {
+      // skip
+    }
+  };
+  const promises = Object.entries(CATEGORY_AUTHORS).flatMap(([category, authors]) =>
+    authors.map(author => fetchAuthor(category, author))
+  );
+  await Promise.all(promises);
+  setLoading(false);
+}
+    fetchPoems();
+  }, []);
+
+  const filteredPoems = poems.filter(p => {
+    const matchesSearch =
+      p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.author.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filter === 'All' || p.category === filter;
     return matchesSearch && matchesFilter;
   });
@@ -756,30 +948,26 @@ function PoetryLibraryView() {
   if (selectedPoem) {
     return (
       <div className="p-8 max-w-4xl mx-auto">
-        <button 
+        <button
           onClick={() => setSelectedPoem(null)}
           className="flex items-center gap-2 text-lilac-600 hover:text-lilac-800 mb-8 transition-colors"
         >
           <ChevronRight size={20} className="rotate-180" />
           <span>Back to Library</span>
         </button>
-
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-lilac-100">
           <div className="p-12 parchment-bg">
             <h2 className="text-4xl font-serif text-stone-800 mb-2">{selectedPoem.title}</h2>
             <p className="text-xl font-serif text-stone-600 italic mb-12">by {selectedPoem.author}</p>
-            
             <div className="whitespace-pre-wrap font-serif text-lg leading-relaxed text-stone-800 max-w-2xl">
               {selectedPoem.content}
             </div>
           </div>
-          
           <div className="p-12 bg-white border-t border-lilac-50 space-y-8">
             <div>
               <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">About the Poem</h3>
               <p className="text-slate-600 leading-relaxed">{selectedPoem.description}</p>
             </div>
-            
             <div className="bg-lilac-50 rounded-xl p-6">
               <h3 className="text-sm uppercase tracking-widest text-lilac-700 font-bold mb-3">Theme Breakdown</h3>
               <p className="text-lilac-800 leading-relaxed italic">{selectedPoem.themeBreakdown}</p>
@@ -793,12 +981,11 @@ function PoetryLibraryView() {
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <h2 className="text-3xl font-serif text-lilac-800 mb-8">Poetry Library</h2>
-      
       <div className="flex flex-col md:flex-row gap-4 mb-8">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-lilac-300" size={20} />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Search by poet or title..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -806,13 +993,14 @@ function PoetryLibraryView() {
           />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {['All', 'Romantic', 'Nature', 'Classic', 'Narrative', 'Songwriting'].map(cat => (
-            <button 
+{['All', 'Romantic', 'Nature', 'Classic', 'Narrative', 'Indian', 'Hindi'].map(cat => (            <button
               key={cat}
               onClick={() => setFilter(cat)}
               className={cn(
                 "px-6 py-3 rounded-xl border transition-all whitespace-nowrap",
-                filter === cat ? "bg-lilac-600 text-white border-lilac-600" : "bg-white border-lilac-100 text-slate-600 hover:bg-lilac-50"
+                filter === cat
+                  ? "bg-lilac-600 text-white border-lilac-600"
+                  : "bg-white border-lilac-100 text-slate-600 hover:bg-lilac-50"
               )}
             >
               {cat}
@@ -821,26 +1009,34 @@ function PoetryLibraryView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredPoems.map(poem => (
-          <div 
-            key={poem.id}
-            onClick={() => setSelectedPoem(poem)}
-            className="bg-white rounded-2xl p-8 border border-lilac-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
-          >
-            <span className="text-[10px] uppercase tracking-widest text-lilac-400 font-bold">{poem.category}</span>
-            <h3 className="text-2xl font-serif text-slate-800 mb-2 group-hover:text-lilac-600 transition-colors">{poem.title}</h3>
-            <p className="text-slate-500 font-serif italic mb-6">by {poem.author}</p>
-            <p className="text-slate-400 text-sm line-clamp-3 mb-6">
-              {poem.content}
-            </p>
-            <div className="flex items-center gap-2 text-lilac-600 font-medium text-sm">
-              <span>Read Full Poem</span>
-              <ChevronRight size={16} />
+      {loading ? (
+        <div className="text-center py-20 text-lilac-400 font-serif text-lg italic">
+          Loading poems from the library...
+        </div>
+      ) : filteredPoems.length === 0 ? (
+        <div className="text-center py-20 text-slate-400 font-serif text-lg italic">
+          No poems found.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredPoems.map(poem => (
+            <div
+              key={poem.id}
+              onClick={() => setSelectedPoem(poem)}
+              className="bg-white rounded-2xl p-8 border border-lilac-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+            >
+              <span className="text-[10px] uppercase tracking-widest text-lilac-400 font-bold">{poem.category}</span>
+              <h3 className="text-2xl font-serif text-slate-800 mb-2 group-hover:text-lilac-600 transition-colors">{poem.title}</h3>
+              <p className="text-slate-500 font-serif italic mb-6">by {poem.author}</p>
+              <p className="text-slate-400 text-sm line-clamp-3 mb-6">{poem.content}</p>
+              <div className="flex items-center gap-2 text-lilac-600 font-medium text-sm">
+                <span>Read Full Poem</span>
+                <ChevronRight size={16} />
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
