@@ -7,7 +7,7 @@
   --color-lilac-300: #d4c4a8;
   --color-lilac-400: #9c9080;
   --color-lilac-500: #a8845a;
-  --color-lilac-600: #c9957a;
+  --color-lilac-600: #b87355;
   --color-lilac-700: #be8a6f;
   --color-lilac-800: #2e3d30;
   --color-lilac-900: #0f1a0f;
@@ -64,7 +64,7 @@
     background: rgba(255, 255, 255, 0.1);
     color: white;
     font-weight: 500;
-    border-left-color: #d4a882;
+    border-left-color: #b87355;
   }
 
   .skeleton-shimmer {

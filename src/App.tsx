@@ -268,7 +268,7 @@ export default function App() {
       {/* Sidebar */}
       <aside
         className="w-full md:w-64 flex-shrink-0 flex flex-col py-4 shadow-sm"
-        style={{ background: '#4a6355', borderRight: '1px solid #3a5244' }}
+        style={{ background: '#2d4a35', borderRight: '1px solid #1f3527' }}
       >
         <Logo />
         <nav className="flex-1 px-3 space-y-1">
@@ -430,7 +430,7 @@ function DashboardView({ savedPoems, onBeginWriting, onExploreLibrary }: {
       {/* Pull quote */}
       <div
         className="my-10 pl-6 py-2"
-        style={{ borderLeft: '4px solid #d4a882' }}
+        style={{ borderLeft: '4px solid #b87355' }}
       >
         <p
           className="text-2xl md:text-3xl italic leading-relaxed"
@@ -461,7 +461,7 @@ function DashboardView({ savedPoems, onBeginWriting, onExploreLibrary }: {
                 key={poem.id}
                 className="flex-shrink-0 w-56 p-4"
                 style={{
-                  background: '#ffffff',
+                  background: '#fdfaf6',
                   border: '1px solid #ede7d9',
                   borderRadius: '14px',
                 }}
@@ -502,7 +502,7 @@ function DashboardView({ savedPoems, onBeginWriting, onExploreLibrary }: {
         <button
           onClick={onBeginWriting}
           className="px-10 py-4 rounded-full text-white text-lg shadow-md transition-opacity hover:opacity-90"
-          style={{ background: '#c9957a', fontFamily: 'Georgia, serif' }}
+          style={{ background: '#b87355', fontFamily: 'Georgia, serif' }}
         >
           Begin writing →
         </button>
@@ -1067,7 +1067,7 @@ function SkeletonCard() {
   return (
     <div
       className="rounded-2xl p-8 border"
-      style={{ background: '#ffffff', borderColor: '#ede7d9' }}
+      style={{ background: '#fdfaf6', borderColor: '#ede7d9' }}
     >
       <div className="skeleton-shimmer h-3 w-16 mb-4" />
       <div className="skeleton-shimmer h-7 w-3/4 mb-3" />
