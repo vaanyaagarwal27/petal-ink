@@ -23,8 +23,8 @@ export interface LibraryPoem {
   author: string;
   content: string;
   description: string;
-  category: 'Romantic' | 'Nature' | 'Classic' | 'Narrative';
+  category: 'Romantic' | 'Nature' | 'Classic' | 'Narrative' | 'Indian' | 'Hindi';
   themeBreakdown: string;
 }
 
-export type View = 'new-poem' | 'theme-generator' | 'saved-poems' | 'rhyming-dictionary' | 'writing-insights' | 'poetry-library';
+export type View = 'dashboard' | 'new-poem' | 'theme-generator' | 'saved-poems' | 'rhyming-dictionary' | 'writing-insights' | 'poetry-library';
