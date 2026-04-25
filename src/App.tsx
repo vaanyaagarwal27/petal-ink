@@ -569,47 +569,40 @@ function NewPoemView({ poem, onSave, initialTheme }: { poem: Poem | null, onSave
   );
 }
 
+const MOOD_PILLS = ['Melancholic', 'Hopeful', 'Tender', 'Fierce', 'Dreamy', 'Unresolved'] as const;
+const STYLE_PILLS = ['Lyrical', 'Narrative', 'Abstract', 'Spoken word'] as const;
+
 function ThemeGeneratorView({ onThemeGenerated }: { onThemeGenerated: (theme: ThemeGeneration) => void }) {
-  const [step, setStep] = useState(1);
-  const [answers, setAnswers] = useState({
-    style: '',
-    mood: '',
-    platform: '',
-    keywords: '',
-    wantsRhyme: false,
-    rhymeScheme: ''
-  });
+  const [input, setInput] = useState('');
+  const [selectedMood, setSelectedMood] = useState('');
+  const [selectedStyle, setSelectedStyle] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ThemeGeneration | null>(null);
 
   const generateTheme = async () => {
+    if (!input.trim()) return;
     setLoading(true);
     try {
       const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `You are a poetry and songwriting assistant for an app called Petal&Ink.
-        Based on the following preferences, generate a creative theme, imagery ideas, metaphor suggestions, and atmosphere/tone suggestions.
-        Also provide specific examples of personification, simile, and hyperbole that fit this theme.
-        DO NOT write a full poem or song. Provide only inspiration and direction.
+        contents: `You are a poetry muse for an app called Petal&Ink. The user has given you a starting point for a poem.
 
-        Style/Type: ${answers.style}
-        Mood: ${answers.mood}
-        Platform: ${answers.platform}
-        Keywords: ${answers.keywords}
-        Rhyme Scheme: ${answers.wantsRhyme ? (answers.rhymeScheme || 'Any') : 'None'}
+User's starting point: "${input}"${selectedMood ? `\nMood preference: ${selectedMood}` : ''}${selectedStyle ? `\nStyle preference: ${selectedStyle}` : ''}
 
-        Return the response in JSON format with the following keys:
-        - theme (string)
-        - imagery (array of strings)
-        - metaphors (array of strings)
-        - atmosphere (string)
-        - personification (array of strings, each being a short line/phrase)
-        - simile (array of strings, each being a short line/phrase)
-        - hyperbole (array of strings, each being a short line/phrase)`,
-        config: {
-          responseMimeType: "application/json"
-        }
+Generate a creative spark to help them begin writing. Be specific to what they've given you — not generic. Respond in JSON with exactly these keys:
+- mood (string): one evocative word capturing the emotional register
+- prompt (string): 2-3 sentences — a concrete, sensory writing prompt built directly around their starting point
+- firstLine (string): one suggested opening line for the poem, poetic and specific to their input
+- avoidWords (array of exactly 3 strings): clichéd words or phrases to avoid for this particular theme
+- theme (string): a short evocative theme title
+- imagery (array of strings): 4-6 specific images or scenes to draw from
+- metaphors (array of strings): 3-4 metaphor ideas
+- atmosphere (string): one sentence describing the tone and atmosphere
+- personification (array of strings): 2-3 short example lines
+- simile (array of strings): 2-3 short example lines
+- hyperbole (array of strings): 2-3 short example lines`,
+        config: { responseMimeType: "application/json" }
       });
 
       const data = JSON.parse(response.text || '{}');
@@ -625,77 +618,123 @@ function ThemeGeneratorView({ onThemeGenerated }: { onThemeGenerated: (theme: Th
   if (result) {
     return (
       <div className="p-8 max-w-3xl mx-auto">
-        <h2 className="text-3xl font-serif text-lilac-800 mb-8">Your Creative Spark</h2>
-        <div className="bg-white rounded-2xl p-8 shadow-sm border border-lilac-200 space-y-8">
-          <div>
-            <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-2">Theme</h3>
-            <p className="text-2xl font-serif text-slate-800">{result.theme}</p>
-          </div>
+        <div className="rounded-2xl shadow-sm border border-lilac-200 overflow-hidden" style={{ background: '#fdfaf6' }}>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">Imagery</h3>
-              <ul className="space-y-2">
-                {result.imagery.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-slate-600">
-                    <span className="text-lilac-600 mt-1">•</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">Metaphors</h3>
-              <ul className="space-y-2">
-                {result.metaphors.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-slate-600">
-                    <span className="text-lilac-600 mt-1">•</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          {/* ── Section 1: Your Spark ── */}
+          <div className="p-8 space-y-6">
+            <p className="text-xs uppercase tracking-widest font-bold text-lilac-400">Your Spark</p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t border-lilac-100">
-            <div>
-              <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">Personification</h3>
-              <ul className="space-y-2 italic text-sm text-slate-500">
-                {result.personification?.map((item, i) => (
-                  <li key={i}>"{item}"</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">Simile</h3>
-              <ul className="space-y-2 italic text-sm text-slate-500">
-                {result.simile?.map((item, i) => (
-                  <li key={i}>"{item}"</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">Hyperbole</h3>
-              <ul className="space-y-2 italic text-sm text-slate-500">
-                {result.hyperbole?.map((item, i) => (
-                  <li key={i}>"{item}"</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-2">Atmosphere &amp; Tone</h3>
-            <p className="text-slate-600 italic">"{result.atmosphere}"</p>
-          </div>
-
-          <div className="pt-6 border-t border-lilac-100 flex gap-4">
-            <button
-              onClick={() => setResult(null)}
-              className="px-6 py-2 rounded-full border border-lilac-200 text-lilac-600 hover:bg-lilac-50 transition-colors"
+            <p
+              className="text-3xl italic leading-snug"
+              style={{ fontFamily: 'Georgia, serif', color: '#b87355' }}
             >
-              Start Over
-            </button>
+              {result.mood}
+            </p>
+
+            <p className="text-slate-700 leading-relaxed">{result.prompt}</p>
+
+            <div className="pl-5 py-3" style={{ borderLeft: '3px solid #b87355' }}>
+              <p
+                className="text-xl italic leading-relaxed"
+                style={{ fontFamily: 'Georgia, serif', color: '#2e3d30' }}
+              >
+                &ldquo;{result.firstLine}&rdquo;
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-widest font-bold text-lilac-400 mb-3">Words to avoid</p>
+              <div className="flex gap-2 flex-wrap">
+                {result.avoidWords?.map(word => (
+                  <span
+                    key={word}
+                    className="px-3 py-1 rounded-full text-sm border"
+                    style={{ borderColor: '#ede7d9', color: '#9c9080', textDecoration: 'line-through' }}
+                  >
+                    {word}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Divider ── */}
+          <div className="border-t border-lilac-200" />
+
+          {/* ── Section 2: Go Deeper ── */}
+          <div className="p-8 space-y-8">
+            <p className="text-xs uppercase tracking-widest font-bold text-lilac-400">Go Deeper</p>
+
+            <div>
+              <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-2">Theme</h3>
+              <p className="text-2xl font-serif text-slate-800">{result.theme}</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">Imagery</h3>
+                <ul className="space-y-2">
+                  {result.imagery.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-slate-600">
+                      <span className="text-lilac-600 mt-1">•</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">Metaphors</h3>
+                <ul className="space-y-2">
+                  {result.metaphors.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-slate-600">
+                      <span className="text-lilac-600 mt-1">•</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t border-lilac-100">
+              <div>
+                <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">Personification</h3>
+                <ul className="space-y-2 italic text-sm text-slate-500">
+                  {result.personification?.map((item, i) => (
+                    <li key={i}>"{item}"</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">Simile</h3>
+                <ul className="space-y-2 italic text-sm text-slate-500">
+                  {result.simile?.map((item, i) => (
+                    <li key={i}>"{item}"</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">Hyperbole</h3>
+                <ul className="space-y-2 italic text-sm text-slate-500">
+                  {result.hyperbole?.map((item, i) => (
+                    <li key={i}>"{item}"</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-2">Atmosphere &amp; Tone</h3>
+              <p className="text-slate-600 italic">"{result.atmosphere}"</p>
+            </div>
+
+            <div className="pt-6 border-t border-lilac-100">
+              <button
+                onClick={() => setResult(null)}
+                className="px-6 py-2 rounded-full border border-lilac-200 text-lilac-600 hover:bg-lilac-50 transition-colors"
+              >
+                Start Over
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -703,177 +742,76 @@ function ThemeGeneratorView({ onThemeGenerated }: { onThemeGenerated: (theme: Th
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <h2 className="text-3xl font-serif text-lilac-800 mb-8">AI Theme Generator</h2>
+    <div className="p-8 md:p-12 max-w-2xl mx-auto">
+      <h2
+        className="text-3xl md:text-4xl mb-10 leading-snug"
+        style={{ fontFamily: 'Georgia, serif', color: '#2e3d30' }}
+      >
+        what's sitting with you right now?
+      </h2>
 
-      <div className="bg-white rounded-2xl p-8 shadow-sm border border-lilac-200">
-        <div className="mb-8 flex gap-2">
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className={cn("h-1 flex-1 rounded-full", i <= step ? "bg-lilac-600" : "bg-lilac-100")} />
-          ))}
+      <div className="space-y-8">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !loading && generateTheme()}
+          placeholder="a word, a feeling, a moment... (e.g. '3am', 'almost', 'my mother's hands')"
+          className="w-full bg-transparent border-b-2 border-lilac-200 py-3 text-lg focus:outline-none focus:border-lilac-600 text-slate-800 placeholder-slate-400"
+          style={{ fontFamily: 'Georgia, serif' }}
+        />
+
+        <div>
+          <p className="text-xs uppercase tracking-widest font-bold text-lilac-400 mb-3">Mood</p>
+          <div className="flex flex-wrap gap-2">
+            {MOOD_PILLS.map(mood => (
+              <button
+                key={mood}
+                onClick={() => setSelectedMood(selectedMood === mood ? '' : mood)}
+                className="px-4 py-1.5 rounded-full text-sm border transition-all"
+                style={selectedMood === mood
+                  ? { background: '#b87355', color: 'white', borderColor: '#b87355' }
+                  : { background: 'white', color: '#2e3d30', borderColor: '#ede7d9' }
+                }
+              >
+                {mood}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="space-y-6"
-          >
-            {step === 1 && (
-              <Question
-                label="What style of poetry or writing are you doing?"
-                options={['Lyrical', 'Storytelling', 'Abstract', 'Romantic', 'Reflective', 'Songwriting']}
-                value={answers.style}
-                onChange={(v) => setAnswers({...answers, style: v})}
-                onNext={() => setStep(2)}
-              />
-            )}
-            {step === 2 && (
-              <div className="space-y-4">
-                <label className="block text-lg font-serif text-slate-700">What mood should it have?</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['Nostalgic', 'Hopeful', 'Melancholic', 'Dreamy', 'Intense'].map(opt => (
-                    <button
-                      key={opt}
-                      onClick={() => {
-                        setAnswers({...answers, mood: opt});
-                        setStep(3);
-                      }}
-                      className={cn(
-                        "text-left p-4 rounded-xl border transition-all",
-                        answers.mood === opt ? "bg-lilac-100 border-lilac-400 text-lilac-800" : "border-lilac-200 hover:bg-lilac-50 text-slate-600"
-                      )}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-                <div className="pt-4 border-t border-lilac-100">
-                  <label className="block text-sm text-slate-500 mb-2">Or enter a custom mood:</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g., Ethereal, Gritty, Playful..."
-                      value={['Nostalgic', 'Hopeful', 'Melancholic', 'Dreamy', 'Intense'].includes(answers.mood) ? '' : answers.mood}
-                      onChange={(e) => setAnswers({...answers, mood: e.target.value})}
-                      className="flex-1 p-3 rounded-xl border border-lilac-200 focus:outline-none focus:ring-2 focus:ring-lilac-200"
-                    />
-                    <button
-                      onClick={() => answers.mood && setStep(3)}
-                      className="px-6 bg-lilac-600 text-white rounded-xl hover:bg-lilac-700 disabled:opacity-50"
-                      disabled={!answers.mood}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {step === 3 && (
-              <Question
-                label="Where will the poem be used or posted?"
-                options={['Instagram', 'Poetry Book', 'Spoken Word', 'Personal Journal']}
-                value={answers.platform}
-                onChange={(v) => setAnswers({...answers, platform: v})}
-                onNext={() => setStep(4)}
-              />
-            )}
-            {step === 4 && (
-              <div className="space-y-4">
-                <label className="block text-lg font-serif text-slate-700">Do you have any keywords you want included? (optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g., willow, storm, echo..."
-                  value={answers.keywords}
-                  onChange={(e) => setAnswers({...answers, keywords: e.target.value})}
-                  className="w-full p-4 rounded-xl border border-lilac-200 focus:outline-none focus:ring-2 focus:ring-lilac-200"
-                />
-                <button
-                  onClick={() => setStep(5)}
-                  className="w-full py-3 bg-lilac-600 text-white rounded-xl hover:bg-lilac-700 transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-            {step === 5 && (
-              <div className="space-y-6">
-                <label className="block text-lg font-serif text-slate-700">Do you want a rhyming scheme?</label>
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => setAnswers({...answers, wantsRhyme: true})}
-                    className={cn("flex-1 py-4 rounded-xl border transition-all", answers.wantsRhyme ? "bg-lilac-100 border-lilac-400 text-lilac-800" : "border-lilac-200 hover:bg-lilac-50")}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAnswers({...answers, wantsRhyme: false});
-                      generateTheme();
-                    }}
-                    className={cn("flex-1 py-4 rounded-xl border transition-all", !answers.wantsRhyme ? "bg-lilac-100 border-lilac-400 text-lilac-800" : "border-lilac-200 hover:bg-lilac-50")}
-                  >
-                    No
-                  </button>
-                </div>
-
-                {answers.wantsRhyme && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-4">
-                    <label className="block text-sm text-slate-500">Specific scheme (optional)</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {['ABAB', 'AABB', 'Free Rhyme', 'Skip'].map(s => (
-                        <button
-                          key={s}
-                          onClick={() => {
-                            setAnswers({...answers, rhymeScheme: s === 'Skip' ? '' : s});
-                            generateTheme();
-                          }}
-                          className="py-2 rounded-lg border border-lilac-200 hover:bg-lilac-50 text-sm"
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-
-        {loading && (
-          <div className="mt-8 flex flex-col items-center gap-4">
-            <div className="w-8 h-8 border-4 border-lilac-200 border-t-lilac-600 rounded-full animate-spin" />
-            <p className="text-lilac-600 font-serif italic">Consulting the muses...</p>
+        <div>
+          <p className="text-xs uppercase tracking-widest font-bold text-lilac-400 mb-3">Style</p>
+          <div className="flex flex-wrap gap-2">
+            {STYLE_PILLS.map(style => (
+              <button
+                key={style}
+                onClick={() => setSelectedStyle(selectedStyle === style ? '' : style)}
+                className="px-4 py-1.5 rounded-full text-sm border transition-all"
+                style={selectedStyle === style
+                  ? { background: '#b87355', color: 'white', borderColor: '#b87355' }
+                  : { background: 'white', color: '#2e3d30', borderColor: '#ede7d9' }
+                }
+              >
+                {style}
+              </button>
+            ))}
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
+        </div>
 
-function Question({ label, options, value, onChange, onNext }: { label: string, options: string[], value: string, onChange: (v: string) => void, onNext: () => void }) {
-  return (
-    <div className="space-y-4">
-      <label className="block text-lg font-serif text-slate-700">{label}</label>
-      <div className="grid grid-cols-1 gap-2">
-        {options.map(opt => (
+        <div className="flex items-center gap-4">
           <button
-            key={opt}
-            onClick={() => {
-              onChange(opt);
-              onNext();
-            }}
-            className={cn(
-              "text-left p-4 rounded-xl border transition-all",
-              value === opt ? "bg-lilac-100 border-lilac-400 text-lilac-800" : "border-lilac-200 hover:bg-lilac-50 text-slate-600"
-            )}
+            onClick={generateTheme}
+            disabled={!input.trim() || loading}
+            className="px-10 py-3 rounded-full text-white text-base shadow-md transition-opacity hover:opacity-90 disabled:opacity-40"
+            style={{ background: '#b87355', fontFamily: 'Georgia, serif' }}
           >
-            {opt}
+            {loading ? 'Conjuring...' : 'Generate →'}
           </button>
-        ))}
+          {loading && (
+            <p className="text-lilac-400 font-serif italic text-sm">Consulting the muses...</p>
+          )}
+        </div>
       </div>
     </div>
   );

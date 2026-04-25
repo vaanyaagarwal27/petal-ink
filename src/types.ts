@@ -8,6 +8,10 @@ export interface Poem {
 }
 
 export interface ThemeGeneration {
+  mood: string;
+  prompt: string;
+  firstLine: string;
+  avoidWords: string[];
   theme: string;
   imagery: string[];
   metaphors: string[];
