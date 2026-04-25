@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-lilac-50: #faf7f2;
+  --color-lilac-50: #f7f3ec;
   --color-lilac-100: #f0ece4;
-  --color-lilac-200: #e8e0d0;
+  --color-lilac-200: #ede7d9;
   --color-lilac-300: #d4c4a8;
-  --color-lilac-400: #8a7a60;
+  --color-lilac-400: #9c9080;
   --color-lilac-500: #a8845a;
-  --color-lilac-600: #c17a4a;
-  --color-lilac-700: #a8632f;
-  --color-lilac-800: #1a2e1e;
+  --color-lilac-600: #c9957a;
+  --color-lilac-700: #be8a6f;
+  --color-lilac-800: #2e3d30;
   --color-lilac-900: #0f1a0f;
 
-  --color-rose-50: #faf7f2;
+  --color-rose-50: #f7f3ec;
   --color-rose-100: #f0ece4;
-  --color-rose-200: #e8e0d0;
+  --color-rose-200: #ede7d9;
   --color-rose-300: #d4c4a8;
 
   --font-serif: "Playfair Display", "Georgia", serif;
@@ -24,7 +24,7 @@
 @layer base {
   body {
     @apply bg-lilac-50 font-sans;
-    color: #1a2e1e;
+    color: #2e3d30;
   }
 }
 
@@ -61,10 +61,10 @@
   }
 
   .sidebar-item.active {
-    background: rgba(193, 122, 74, 0.15);
+    background: rgba(255, 255, 255, 0.1);
     color: white;
     font-weight: 500;
-    border-left-color: #c17a4a;
+    border-left-color: #d4a882;
   }
 
   .skeleton-shimmer {

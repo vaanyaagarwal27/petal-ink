@@ -204,7 +204,7 @@ Any language I like?`,
 const Logo = () => (
   <div className="flex items-center gap-2 mb-8 px-4">
     <div className="relative w-10 h-10 flex items-center justify-center">
-      <svg viewBox="0 0 100 100" className="w-full h-full" style={{ fill: '#c17a4a' }}>
+      <svg viewBox="0 0 100 100" className="w-full h-full" style={{ fill: '#c9957a' }}>
         <path d="M40,20 C30,20 20,30 20,45 C20,60 30,70 40,70 L40,85 L45,85 L45,70 C55,70 65,60 65,45 C65,30 55,20 40,20 Z M40,60 C35,60 30,55 30,45 C30,35 35,30 40,30 C45,30 50,35 50,45 C50,55 45,60 40,60 Z" />
         <path d="M70,20 L70,80 L75,80 L75,20 Z" />
         <path d="M60,15 L85,15 L85,20 L60,20 Z" />
@@ -264,11 +264,11 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen overflow-hidden" style={{ background: '#faf7f2' }}>
+    <div className="flex flex-col md:flex-row min-h-screen overflow-hidden" style={{ background: '#f7f3ec' }}>
       {/* Sidebar */}
       <aside
         className="w-full md:w-64 flex-shrink-0 flex flex-col py-4 shadow-sm"
-        style={{ background: '#2d4a35', borderRight: '1px solid #1f3527' }}
+        style={{ background: '#4a6355', borderRight: '1px solid #3a5244' }}
       >
         <Logo />
         <nav className="flex-1 px-3 space-y-1">
@@ -410,18 +410,18 @@ function DashboardView({ savedPoems, onBeginWriting, onExploreLibrary }: {
   const recentPoems = savedPoems.slice(0, 3);
 
   return (
-    <div className="min-h-full p-8 md:p-12 max-w-4xl mx-auto" style={{ color: '#1a2e1e' }}>
+    <div className="min-h-full p-8 md:p-12 max-w-4xl mx-auto" style={{ color: '#2e3d30' }}>
       {/* Greeting + date */}
       <div className="mb-10">
         <h1
           className="text-4xl md:text-5xl font-bold leading-tight"
-          style={{ fontFamily: 'Georgia, serif', color: '#1a2e1e' }}
+          style={{ fontFamily: 'Georgia, serif', color: '#2e3d30' }}
         >
           {greeting}.
         </h1>
         <p
           className="mt-3 text-lg italic"
-          style={{ fontFamily: 'Georgia, serif', color: '#8a7a60' }}
+          style={{ fontFamily: 'Georgia, serif', color: '#9c9080' }}
         >
           {dateStr}
         </p>
@@ -430,17 +430,17 @@ function DashboardView({ savedPoems, onBeginWriting, onExploreLibrary }: {
       {/* Pull quote */}
       <div
         className="my-10 pl-6 py-2"
-        style={{ borderLeft: '4px solid #c17a4a' }}
+        style={{ borderLeft: '4px solid #d4a882' }}
       >
         <p
           className="text-2xl md:text-3xl italic leading-relaxed"
-          style={{ fontFamily: 'Georgia, serif', color: '#1a2e1e' }}
+          style={{ fontFamily: 'Georgia, serif', color: '#2e3d30' }}
         >
           &ldquo;{quoteData.line}&rdquo;
         </p>
         <p
           className="mt-3 text-sm uppercase tracking-widest"
-          style={{ color: '#8a7a60' }}
+          style={{ color: '#9c9080' }}
         >
           &mdash; {quoteData.source}
         </p>
@@ -451,7 +451,7 @@ function DashboardView({ savedPoems, onBeginWriting, onExploreLibrary }: {
         <div className="mb-10">
           <h2
             className="text-xs uppercase tracking-widest font-bold mb-4"
-            style={{ color: '#8a7a60' }}
+            style={{ color: '#9c9080' }}
           >
             Recent Poems
           </h2>
@@ -462,19 +462,19 @@ function DashboardView({ savedPoems, onBeginWriting, onExploreLibrary }: {
                 className="flex-shrink-0 w-56 p-4"
                 style={{
                   background: '#ffffff',
-                  border: '1px solid #e8e0d0',
+                  border: '1px solid #ede7d9',
                   borderRadius: '14px',
                 }}
               >
                 <p
                   className="text-xs uppercase tracking-widest mb-1 truncate"
-                  style={{ color: '#8a7a60' }}
+                  style={{ color: '#9c9080' }}
                 >
                   #{poem.theme || 'unthemed'}
                 </p>
                 <h3
                   className="font-bold mb-2 truncate"
-                  style={{ fontFamily: 'Georgia, serif', color: '#1a2e1e' }}
+                  style={{ fontFamily: 'Georgia, serif', color: '#2e3d30' }}
                 >
                   {poem.title || 'Untitled'}
                 </h3>
@@ -482,7 +482,7 @@ function DashboardView({ savedPoems, onBeginWriting, onExploreLibrary }: {
                   className="text-sm leading-relaxed"
                   style={{
                     fontFamily: 'Georgia, serif',
-                    color: '#8a7a60',
+                    color: '#9c9080',
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
@@ -502,14 +502,14 @@ function DashboardView({ savedPoems, onBeginWriting, onExploreLibrary }: {
         <button
           onClick={onBeginWriting}
           className="px-10 py-4 rounded-full text-white text-lg shadow-md transition-opacity hover:opacity-90"
-          style={{ background: '#c17a4a', fontFamily: 'Georgia, serif' }}
+          style={{ background: '#c9957a', fontFamily: 'Georgia, serif' }}
         >
           Begin writing →
         </button>
         <button
           onClick={onExploreLibrary}
           className="text-sm transition-colors hover:underline"
-          style={{ color: '#8a7a60' }}
+          style={{ color: '#9c9080' }}
         >
           or explore the library →
         </button>
@@ -1067,7 +1067,7 @@ function SkeletonCard() {
   return (
     <div
       className="rounded-2xl p-8 border"
-      style={{ background: '#ffffff', borderColor: '#e8e0d0' }}
+      style={{ background: '#ffffff', borderColor: '#ede7d9' }}
     >
       <div className="skeleton-shimmer h-3 w-16 mb-4" />
       <div className="skeleton-shimmer h-7 w-3/4 mb-3" />
