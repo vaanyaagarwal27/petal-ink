@@ -978,28 +978,37 @@ function SavedPoemsView({ poems, onDelete, onEdit }: { poems: Poem[], onDelete: 
   );
 }
 
+interface RhymeResults {
+  perfect: string[];
+  near: string[];
+  soundsLike: string[];
+  meansLike: string[];
+}
+
 function RhymingDictionaryView() {
   const [word, setWord] = useState('');
-  const [results, setResults] = useState<{perfect: string[], near: string[], slant: string[]} | null>(null);
+  const [results, setResults] = useState<RhymeResults | null>(null);
   const [loading, setLoading] = useState(false);
 
   const searchRhymes = async () => {
-    if (!word) return;
+    const q = word.trim();
+    if (!q) return;
     setLoading(true);
+    setResults(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Act as a rhyming dictionary. For the word "${word}", provide perfect rhymes, near rhymes, and slant rhymes.
-        Return in JSON format:
-        {
-          "perfect": ["word1", "word2"...],
-          "near": ["word1", "word2"...],
-          "slant": ["word1", "word2"...]
-        }`,
-        config: { responseMimeType: "application/json" }
+      const [perfect, near, soundsLike, meansLike] = await Promise.all([
+        fetch(`https://api.datamuse.com/words?rel_rhy=${encodeURIComponent(q)}&max=20`).then(r => r.json()),
+        fetch(`https://api.datamuse.com/words?rel_nry=${encodeURIComponent(q)}&max=20`).then(r => r.json()),
+        fetch(`https://api.datamuse.com/words?sl=${encodeURIComponent(q)}&max=20`).then(r => r.json()),
+        fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(q)}&max=20`).then(r => r.json()),
+      ]);
+      const extract = (arr: {word: string}[]) => arr.map((x: {word: string}) => x.word);
+      setResults({
+        perfect: extract(perfect),
+        near: extract(near),
+        soundsLike: extract(soundsLike),
+        meansLike: extract(meansLike),
       });
-      setResults(JSON.parse(response.text || '{}'));
     } catch (error) {
       console.error(error);
     } finally {
@@ -1035,7 +1044,8 @@ function RhymingDictionaryView() {
           <div className="space-y-8">
             <RhymeSection title="Perfect Rhymes" words={results.perfect} />
             <RhymeSection title="Near Rhymes" words={results.near} />
-            <RhymeSection title="Slant Rhymes" words={results.slant} />
+            <RhymeSection title="Sounds Like" words={results.soundsLike} />
+            <RhymeSection title="words that carry this feeling" words={results.meansLike} isFeeling />
           </div>
         )}
       </div>
@@ -1043,16 +1053,68 @@ function RhymingDictionaryView() {
   );
 }
 
-function RhymeSection({ title, words }: { title: string, words: string[] }) {
+function RhymeSection({ title, words, isFeeling = false }: { title: string; words: string[]; isFeeling?: boolean }) {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  if (words.length === 0) return null;
+
+  const handleCopy = (w: string) => {
+    navigator.clipboard.writeText(w).then(() => {
+      setCopied(w);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  };
+
   return (
     <div>
-      <h3 className="text-sm uppercase tracking-widest text-lilac-400 font-bold mb-3">{title}</h3>
+      <h3 style={{
+        fontSize: '11px',
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        color: '#9c9080',
+        marginBottom: '10px',
+        fontWeight: 600,
+      }}>
+        {title}{' '}
+        {!isFeeling && (
+          <span style={{ color: '#b87355', fontWeight: 700 }}>({words.length})</span>
+        )}
+      </h3>
       <div className="flex flex-wrap gap-2">
-        {words.length > 0 ? words.map(w => (
-          <span key={w} className="px-3 py-1 bg-lilac-50 text-lilac-800 rounded-lg text-sm">{w}</span>
-        )) : <span className="text-slate-400 italic text-sm">None found</span>}
+        {words.map(w => (
+          <RhymePill key={w} word={w} copied={copied === w} onCopy={handleCopy} />
+        ))}
       </div>
     </div>
+  );
+}
+
+function RhymePill({ word, copied, onCopy }: { word: string; copied: boolean; onCopy: (w: string) => void }) {
+  const [hovered, setHovered] = useState(false);
+
+  const pillStyle: React.CSSProperties = {
+    background: copied ? '#e8f5e9' : '#fff',
+    border: `1px solid ${copied ? '#66bb6a' : hovered ? '#b87355' : '#ede7d9'}`,
+    borderRadius: '999px',
+    padding: '6px 16px',
+    fontSize: '13px',
+    color: copied ? '#2e7d32' : hovered ? '#8b4513' : '#3a2e20',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    position: 'relative',
+    userSelect: 'none',
+  };
+
+  return (
+    <span
+      style={pillStyle}
+      onClick={() => onCopy(word)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title={copied ? '✓ copied' : 'click to copy'}
+    >
+      {copied ? `✓ ${word}` : word}
+    </span>
   );
 }
 
