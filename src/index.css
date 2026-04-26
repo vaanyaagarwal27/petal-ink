@@ -67,6 +67,16 @@
     border-left-color: #b87355;
   }
 
+  /* NewPoemView editor */
+  .poem-title-input::placeholder { color: #c0a880; }
+  .poem-theme-input::placeholder  { color: #c0a880; }
+  .poem-body:empty::before {
+    content: attr(data-placeholder);
+    color: #c0a880;
+    pointer-events: none;
+    display: block;
+  }
+
   .skeleton-shimmer {
     background: linear-gradient(90deg, #f0ece4 25%, #e8e2d8 50%, #f0ece4 75%);
     background-size: 200% 100%;

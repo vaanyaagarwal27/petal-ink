@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   PenLine,
   Sparkles,
@@ -520,50 +520,128 @@ function DashboardView({ savedPoems, onBeginWriting, onExploreLibrary }: {
 
 function NewPoemView({ poem, onSave, initialTheme }: { poem: Poem | null, onSave: (title: string, content: string, theme: string) => void, initialTheme: string }) {
   const [title, setTitle] = useState(poem?.title || '');
-  const [content, setContent] = useState(poem?.content || '');
   const [theme, setTheme] = useState(poem?.theme || initialTheme || '');
+  const [wordCount, setWordCount] = useState(0);
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (editorRef.current) {
+      if (poem?.content) {
+        editorRef.current.innerText = poem.content;
+        const trimmed = poem.content.trim();
+        setWordCount(trimmed ? trimmed.split(/\s+/).length : 0);
+      }
+      editorRef.current.focus();
+    }
+  }, []);
+
+  const handleInput = () => {
+    const text = editorRef.current?.innerText || '';
+    const trimmed = text.trim();
+    setWordCount(trimmed ? trimmed.split(/\s+/).length : 0);
+    // Typewriter: keep cursor near vertical centre of the scrollable main panel
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+    const range = selection.getRangeAt(0).cloneRange();
+    range.collapse(true);
+    const rect = range.getBoundingClientRect();
+    const main = document.querySelector('main');
+    if (!main) return;
+    const mainRect = main.getBoundingClientRect();
+    const cursorRelTop = rect.top - mainRect.top;
+    main.scrollTo({ top: Math.max(0, main.scrollTop + cursorRelTop - main.clientHeight / 2), behavior: 'smooth' });
+  };
+
+  const applyFormat = (prefix: string, suffix: string) => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const selected = sel.toString();
+    document.execCommand('insertText', false, prefix + selected + suffix);
+  };
+
+  const handleSave = () => {
+    onSave(title, editorRef.current?.innerText || '', theme);
+  };
+
+  const wordLabel = (n: number) =>
+    n < 10 ? 'just getting started' : n <= 50 ? `${n} words` : `${n} words · keep going`;
+
+  const inputBase: React.CSSProperties = {
+    width: '100%',
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    display: 'block',
+  };
 
   return (
-    <div className="h-full flex flex-col p-8 max-w-4xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-serif text-lilac-800">{poem ? 'Edit Poem' : 'New Poem'}</h2>
-        <button
-          onClick={() => onSave(title, content, theme)}
-          className="flex items-center gap-2 bg-lilac-600 text-white px-6 py-2 rounded-full hover:bg-lilac-700 transition-colors shadow-md"
-        >
-          <Save size={18} />
-          <span>Save Poem</span>
-        </button>
-      </div>
+    <div style={{ background: '#f0e8d4', minHeight: '100%' }}>
+      <div style={{ maxWidth: '720px', margin: '0 auto', padding: '48px 60px', position: 'relative', minHeight: '100vh' }}>
 
-      <div className="mb-4">
+        {/* Save — top right */}
+        <div style={{ position: 'absolute', top: '48px', right: '60px' }}>
+          <button
+            onClick={handleSave}
+            style={{ background: '#8b6340', color: '#fdf8ef', borderRadius: '10px', padding: '10px 24px', fontFamily: 'system-ui', fontSize: '13px', border: 'none', cursor: 'pointer' }}
+          >
+            Save Poem
+          </button>
+        </div>
+
+        {/* Title */}
         <input
           type="text"
           placeholder="Poem Title..."
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full bg-transparent border-b border-lilac-200 py-2 text-xl font-serif focus:outline-none focus:border-lilac-400 text-slate-700"
+          onChange={e => setTitle(e.target.value)}
+          className="poem-title-input"
+          style={{ ...inputBase, fontFamily: 'Georgia, serif', fontSize: '28px', color: '#2e2418', borderBottom: '1px solid #d8c8a8', paddingBottom: '8px', marginBottom: '12px' }}
         />
-      </div>
 
-      <div className="mb-6">
+        {/* Theme */}
         <input
           type="text"
-          placeholder="Theme (e.g., Nature, Solitude)..."
+          placeholder="theme (e.g. heartbreak, longing)..."
           value={theme}
-          onChange={(e) => setTheme(e.target.value)}
-          className="w-full bg-transparent border-b border-lilac-200 py-1 text-sm italic focus:outline-none focus:border-lilac-400 text-slate-500"
+          onChange={e => setTheme(e.target.value)}
+          className="poem-theme-input"
+          style={{ ...inputBase, fontFamily: 'system-ui', fontSize: '13px', color: '#988060', borderBottom: '1px solid #e4d8c0', paddingBottom: '10px', marginBottom: '24px' }}
         />
-      </div>
 
-      <div className="flex-1 parchment-bg rounded-lg p-12 overflow-hidden flex flex-col">
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Begin your verses here..."
-          className="w-full h-full bg-transparent resize-none focus:outline-none font-serif text-lg leading-relaxed text-stone-800 placeholder-stone-400"
-          style={{ fontFamily: "'Playfair Display', serif" }}
+        {/* Formatting toolbar */}
+        <div style={{ display: 'inline-flex', gap: '4px', background: '#e4d8c0', borderRadius: '8px', padding: '4px 8px', marginBottom: '16px' }}>
+          {([
+            { label: 'B', extra: { fontWeight: 'bold' as const },  prefix: '**',  suffix: '**'  },
+            { label: 'I', extra: { fontStyle: 'italic' as const },  prefix: '_',   suffix: '_'   },
+            { label: 'U', extra: { textDecoration: 'underline' as const }, prefix: '<u>', suffix: '</u>' },
+          ] as const).map(({ label, extra, prefix, suffix }) => (
+            <button
+              key={label}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => applyFormat(prefix, suffix)}
+              style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#806040', fontFamily: 'Georgia, serif', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', ...extra }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={handleInput}
+          data-placeholder="Begin your verses here..."
+          className="poem-body"
+          style={{ fontFamily: 'Georgia, serif', fontSize: '15px', lineHeight: '2.1', color: '#3a2e1e', background: 'transparent', border: 'none', minHeight: '300px', outline: 'none' }}
         />
+
+        {/* Word count */}
+        <div style={{ textAlign: 'right', fontFamily: 'system-ui', fontSize: '11px', color: '#a09070', letterSpacing: '0.04em', marginTop: '16px' }}>
+          {wordLabel(wordCount)}
+        </div>
+
       </div>
     </div>
   );
