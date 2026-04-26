@@ -1024,10 +1024,46 @@ function WritingInsightsView({ poems }: { poems: Poem[] }) {
   const [selectedPoemId, setSelectedPoemId] = useState(poems[0]?.id || '');
   const [analysisResult, setAnalysisResult] = useState<AnnotationResult | null>(null);
   const [analysing, setAnalysing] = useState(false);
+  const [bestLine, setBestLine] = useState<{ line: string; poemTitle: string; reason: string } | null>(null);
+  const [bestLineLoading, setBestLineLoading] = useState(false);
 
   const totalPoems = poems.length;
   const uniqueThemes = Object.keys(themes).length;
   const mostUsedWord = topWords[0]?.[0] || '—';
+
+  // Locally-derived observation sentence
+  const observationSentence = (() => {
+    if (poems.length === 0) return null;
+    if (poems.length === 1) return 'One poem written. The hardest part is already done.';
+    const topTheme = sortedThemes[0];
+    const topWord = topWords[0];
+    if (topTheme && topTheme[1] >= 3) {
+      return `${topTheme[1]} poems about ${topTheme[0].toLowerCase()} — you haven't finished with this yet.`;
+    }
+    if (topWord && topWord[1] >= 3) {
+      return `The word "${topWord[0]}" keeps surfacing. Something's unresolved.`;
+    }
+    return `${poems.length} poems written. You're finding your territory.`;
+  })();
+
+  // Fetch "line that hits hardest" on every mount
+  useEffect(() => {
+    if (poems.length === 0) return;
+    setBestLineLoading(true);
+    setBestLine(null);
+    const poemsText = poems
+      .map(p => `${p.title || 'Untitled'}:\n${p.content}`)
+      .join('\n---\n');
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+    ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `You are a sensitive literary reader. Read these poems and find the single most emotionally resonant line across all of them — the one that hits hardest, that feels most true, that a reader would screenshot. Return ONLY valid JSON: { "line": "the exact line", "poemTitle": "which poem it's from", "reason": "one sentence, max 20 words, why this line hits" }\n\nPoems:\n${poemsText}`,
+      config: { responseMimeType: "application/json" },
+    })
+      .then(r => setBestLine(JSON.parse(r.text || '{}')))
+      .catch(console.error)
+      .finally(() => setBestLineLoading(false));
+  }, []);
 
   const analysePoem = async () => {
     const poem = poems.find(p => p.id === selectedPoemId);
@@ -1186,11 +1222,48 @@ ${poem.content}`,
       <h2 className="text-3xl font-serif text-lilac-800 mb-8">Writing Insights</h2>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-4 mb-12">
+      <div className="grid grid-cols-3 gap-4 mb-8">
         <StatCard label="Total poems" value={String(totalPoems)} />
         <StatCard label="Unique themes" value={String(uniqueThemes)} />
         <StatCard label="Most used word" value={mostUsedWord} />
       </div>
+
+      {/* Observation */}
+      {observationSentence && (
+        <p className="mb-10 font-serif" style={{ color: '#2e3d30', fontSize: '15px' }}>
+          {observationSentence}
+        </p>
+      )}
+
+      {/* The line that hits hardest */}
+      {poems.length > 0 && (
+        <section className="mb-12">
+          <span style={sectionLabel}>the line that hits hardest</span>
+          {bestLineLoading && (
+            <div className="space-y-2 pl-6" style={{ borderLeft: '4px solid #ede7d9' }}>
+              <div className="skeleton-shimmer h-7 w-4/5 rounded" />
+              <div className="skeleton-shimmer h-3 w-1/3 rounded" />
+              <div className="skeleton-shimmer h-3 w-3/5 rounded" />
+            </div>
+          )}
+          {bestLine && !bestLineLoading && (
+            <div className="pl-6" style={{ borderLeft: '4px solid #b87355' }}>
+              <p
+                className="text-2xl italic font-serif leading-snug"
+                style={{ color: '#2e3d30' }}
+              >
+                {bestLine.line}
+              </p>
+              <p className="mt-2" style={{ fontSize: '12px', color: '#9c9080' }}>
+                — from &ldquo;{bestLine.poemTitle}&rdquo;
+              </p>
+              <p className="mt-1" style={{ fontStyle: 'italic', fontSize: '13px', color: '#6b7f6e' }}>
+                {bestLine.reason}
+              </p>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* your themes */}
       <section className="mb-12">
