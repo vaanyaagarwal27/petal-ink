@@ -31,4 +31,4 @@ export interface LibraryPoem {
   themeBreakdown: string;
 }
 
-export type View = 'dashboard' | 'new-poem' | 'theme-generator' | 'saved-poems' | 'rhyming-dictionary' | 'writing-insights' | 'poetry-library';
+export type View = 'dashboard' | 'new-poem' | 'theme-generator' | 'saved-poems' | 'rhyming-dictionary' | 'writing-insights' | 'poetry-library' | 'interview';

@@ -300,6 +300,12 @@ export default function App() {
             onClick={() => setCurrentView('saved-poems')}
           />
           <SidebarItem
+            icon={<span style={{ fontSize: '16px', lineHeight: 1 }}>❝</span>}
+            label="Interview"
+            active={currentView === 'interview'}
+            onClick={() => setCurrentView('interview')}
+          />
+          <SidebarItem
             icon={<Search size={20} />}
             label="Rhyming Dictionary"
             active={currentView === 'rhyming-dictionary'}
@@ -360,6 +366,12 @@ export default function App() {
             {currentView === 'rhyming-dictionary' && <RhymingDictionaryView />}
             {currentView === 'writing-insights' && <WritingInsightsView poems={savedPoems} />}
             {currentView === 'poetry-library' && <PoetryLibraryView />}
+            {currentView === 'interview' && (
+              <InterviewView
+                savedPoems={savedPoems}
+                onNavigate={(v) => setCurrentView(v)}
+              />
+            )}
           </motion.div>
         </AnimatePresence>
       </main>
@@ -524,6 +536,12 @@ function NewPoemView({ poem, onSave, initialTheme }: { poem: Poem | null, onSave
   const [wordCount, setWordCount] = useState(0);
   const editorRef = useRef<HTMLDivElement>(null);
 
+  // Auto-theme modal state
+  const [showThemeModal, setShowThemeModal] = useState(false);
+  const [suggestedThemes, setSuggestedThemes] = useState<string[]>([]);
+  const [pendingSaveContent, setPendingSaveContent] = useState('');
+  const [isFetchingThemes, setIsFetchingThemes] = useState(false);
+
   useEffect(() => {
     if (editorRef.current) {
       if (poem?.content) {
@@ -539,7 +557,6 @@ function NewPoemView({ poem, onSave, initialTheme }: { poem: Poem | null, onSave
     const text = editorRef.current?.innerText || '';
     const trimmed = text.trim();
     setWordCount(trimmed ? trimmed.split(/\s+/).length : 0);
-    // Typewriter: keep cursor near vertical centre of the scrollable main panel
     const selection = window.getSelection();
     if (!selection?.rangeCount) return;
     const range = selection.getRangeAt(0).cloneRange();
@@ -557,8 +574,30 @@ function NewPoemView({ poem, onSave, initialTheme }: { poem: Poem | null, onSave
     document.execCommand(command, false);
   };
 
-  const handleSave = () => {
-    onSave(title, editorRef.current?.innerText || '', theme);
+  const handleSave = async () => {
+    const content = editorRef.current?.innerText || '';
+    const words = content.trim().split(/\s+/).filter(Boolean);
+    if (words.length > 10) {
+      setIsFetchingThemes(true);
+      try {
+        const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+        const response = await ai.models.generateContent({
+          model: "gemini-2.0-flash",
+          contents: `Read this poem and suggest exactly 3 possible themes as single words or short phrases (max 3 words each). Return ONLY valid JSON: { "themes": ["theme1", "theme2", "theme3"] }\n\n${content}`,
+          config: { responseMimeType: "application/json" }
+        });
+        const data = JSON.parse(response.text || '{}');
+        setSuggestedThemes(data.themes || []);
+        setPendingSaveContent(content);
+        setShowThemeModal(true);
+      } catch {
+        onSave(title, content, theme);
+      } finally {
+        setIsFetchingThemes(false);
+      }
+    } else {
+      onSave(title, content, theme);
+    }
   };
 
   const wordLabel = (n: number) =>
@@ -580,9 +619,10 @@ function NewPoemView({ poem, onSave, initialTheme }: { poem: Poem | null, onSave
         <div style={{ position: 'absolute', top: '48px', right: '60px' }}>
           <button
             onClick={handleSave}
-            style={{ background: '#8b6340', color: '#fdf8ef', borderRadius: '10px', padding: '10px 24px', fontFamily: 'system-ui', fontSize: '13px', border: 'none', cursor: 'pointer' }}
+            disabled={isFetchingThemes}
+            style={{ background: '#8b6340', color: '#fdf8ef', borderRadius: '10px', padding: '10px 24px', fontFamily: 'system-ui', fontSize: '13px', border: 'none', cursor: isFetchingThemes ? 'wait' : 'pointer', opacity: isFetchingThemes ? 0.7 : 1 }}
           >
-            Save Poem
+            {isFetchingThemes ? 'Reading...' : 'Save Poem'}
           </button>
         </div>
 
@@ -640,6 +680,106 @@ function NewPoemView({ poem, onSave, initialTheme }: { poem: Poem | null, onSave
           {wordLabel(wordCount)}
         </div>
 
+      </div>
+
+      {/* Auto-theme modal */}
+      {showThemeModal && (
+        <ThemePickerModal
+          suggestedThemes={suggestedThemes}
+          initialTheme={theme}
+          onConfirm={(chosenTheme) => {
+            setShowThemeModal(false);
+            onSave(title, pendingSaveContent, chosenTheme);
+          }}
+          onClose={() => {
+            setShowThemeModal(false);
+            onSave(title, pendingSaveContent, theme);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ThemePickerModal({ suggestedThemes, initialTheme, onConfirm, onClose }: {
+  suggestedThemes: string[];
+  initialTheme: string;
+  onConfirm: (theme: string) => void;
+  onClose: () => void;
+}) {
+  const [selectedTheme, setSelectedTheme] = useState(initialTheme);
+  const [customTheme, setCustomTheme] = useState(initialTheme);
+
+  const handlePillClick = (t: string) => {
+    setSelectedTheme(t);
+    setCustomTheme(t);
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 1000,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#fdf8f0', borderRadius: '16px', padding: '2rem 2.5rem',
+          maxWidth: '420px', width: '90%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+        }}
+      >
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', color: '#2e2418', margin: '0 0 6px 0' }}>
+          what's this poem about?
+        </h2>
+        <p style={{ fontSize: '13px', fontStyle: 'italic', color: '#9c9080', margin: '0 0 1.5rem 0' }}>
+          we read it. here's what we think:
+        </p>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '1.25rem' }}>
+          {suggestedThemes.map(t => (
+            <button
+              key={t}
+              onClick={() => handlePillClick(t)}
+              style={{
+                background: selectedTheme === t ? '#b87355' : '#fff',
+                color: selectedTheme === t ? '#fff' : '#3a2e20',
+                border: `1px solid ${selectedTheme === t ? '#b87355' : '#ede7d9'}`,
+                borderRadius: '999px', padding: '8px 20px', fontSize: '13px',
+                cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'system-ui',
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
+        <input
+          type="text"
+          placeholder="or type your own theme..."
+          value={customTheme}
+          onChange={e => { setCustomTheme(e.target.value); setSelectedTheme(''); }}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            background: 'transparent', border: 'none', borderBottom: '1px solid #e4d8c0',
+            outline: 'none', fontFamily: 'system-ui', fontSize: '13px', color: '#3a2e20',
+            padding: '8px 0', marginBottom: '1rem',
+          }}
+        />
+
+        <button
+          onClick={() => onConfirm(customTheme || selectedTheme)}
+          style={{
+            width: '100%', background: '#b87355', color: '#fff',
+            border: 'none', borderRadius: '10px', padding: '12px',
+            fontFamily: 'system-ui', fontSize: '14px', cursor: 'pointer',
+            marginTop: '0.5rem',
+          }}
+        >
+          Save with this theme →
+        </button>
       </div>
     </div>
   );
@@ -1115,6 +1255,307 @@ function RhymePill({ word, copied, onCopy }: { word: string; copied: boolean; on
     >
       {copied ? `✓ ${word}` : word}
     </span>
+  );
+}
+
+function InterviewView({ savedPoems, onNavigate }: { savedPoems: Poem[]; onNavigate: (v: View) => void }) {
+  const [selectedPoem, setSelectedPoem] = useState<Poem | null>(null);
+
+  if (selectedPoem) {
+    return <InterviewScreen poem={selectedPoem} onBack={() => setSelectedPoem(null)} />;
+  }
+
+  return (
+    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '3rem 2rem' }}>
+      <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', color: '#2e2418', margin: '0 0 8px 0' }}>
+        your poems, ready to talk.
+      </h2>
+      <p style={{ fontSize: '14px', fontStyle: 'italic', color: '#9c9080', margin: '0 0 2.5rem 0' }}>
+        pick one. the AI has already read it carefully — it will ask you 10 questions about every line, every word, every feeling you put in.
+      </p>
+
+      {savedPoems.length === 0 ? (
+        <div style={{ background: '#fdf8f0', borderRadius: '16px', padding: '3rem', textAlign: 'center' }}>
+          <p style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#2e2418', margin: '0 0 12px 0' }}>
+            nothing to interview yet.
+          </p>
+          <p style={{ fontSize: '14px', color: '#9c9080', fontStyle: 'italic', margin: '0 0 1.5rem 0' }}>
+            write something first — even a few lines. the interview works best when there's something real to talk about.
+          </p>
+          <button
+            onClick={() => onNavigate('new-poem')}
+            style={{ background: '#b87355', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', cursor: 'pointer', fontFamily: 'system-ui' }}
+          >
+            write something →
+          </button>
+        </div>
+      ) : (
+        <div>
+          {savedPoems.map(poem => (
+            <InterviewPoemRow key={poem.id} poem={poem} onSelect={() => setSelectedPoem(poem)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InterviewPoemRow({ poem, onSelect }: { poem: Poem; onSelect: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const firstLine = poem.content.split('\n').find(l => l.trim()) || poem.content.slice(0, 60);
+
+  return (
+    <div
+      onClick={onSelect}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center',
+        background: '#fff',
+        border: `1px solid ${hovered ? '#b87355' : '#ede7d9'}`,
+        borderRadius: '12px', padding: '1.25rem 1.5rem',
+        marginBottom: '10px', cursor: 'pointer',
+        transform: hovered ? 'translateX(4px)' : 'translateX(0)',
+        transition: 'all 0.15s',
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: '17px', color: '#2e2418', marginBottom: '4px' }}>
+          {poem.title || 'Untitled'}
+        </div>
+        {poem.theme && (
+          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#b87355' }}>
+            {poem.theme}
+          </div>
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0, padding: '0 1rem' }}>
+        <div style={{ fontSize: '13px', fontStyle: 'italic', color: '#9c9080', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {firstLine}
+        </div>
+      </div>
+      <div style={{ opacity: hovered ? 1 : 0, transition: 'opacity 0.15s', fontSize: '13px', color: '#b87355', whiteSpace: 'nowrap', flexShrink: 0 }}>
+        interview →
+      </div>
+    </div>
+  );
+}
+
+function InterviewScreen({ poem, onBack }: { poem: Poem; onBack: () => void }) {
+  interface Message { role: 'model' | 'user'; content: string }
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [answer, setAnswer] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [questionCount, setQuestionCount] = useState(0);
+  const [reflection, setReflection] = useState<string | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const SYSTEM_PROMPT = `You are a deeply perceptive literary interviewer — equal parts therapist and poetry critic. You have read this poem with great care and noticed everything: the specific metaphors, the imagery, the emotional arc, the word choices, what is said and what is deliberately left unsaid, the repetitions, the contradictions, the color words, the people implied but never named.
+
+Your job is to conduct a 10-question interview with the poet about this specific poem. Rules:
+- Quote specific lines when asking about them
+- Ask who real people behind pronouns might be
+- Ask why they chose a specific word or image
+- Ask about lines that feel contradictory or unresolved
+- Build each question on their previous answer AND on other things you noticed in the poem
+- Be warm, genuinely curious, like someone who truly loved this poem
+
+After question 10, write a closing reflection: what you now believe this poem is really about, weaving together what the poem says and what the poet revealed. Make it feel like a gift — an insight they might not have had about their own writing.
+
+The poem is titled "${poem.title}" and reads:
+
+${poem.content}
+
+Ask your first question now. Just the question, nothing else, no preamble.`;
+
+  const buildPrompt = (msgs: Message[], nextInstruction?: string) => {
+    const history = msgs.map(m => `${m.role === 'model' ? 'Interviewer' : 'Poet'}: ${m.content}`).join('\n\n');
+    if (nextInstruction) return `${SYSTEM_PROMPT}\n\nConversation so far:\n${history}\n\n${nextInstruction}`;
+    return SYSTEM_PROMPT;
+  };
+
+  const callGemini = async (prompt: string): Promise<string> => {
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: prompt,
+    });
+    return response.text || '';
+  };
+
+  // Fire first question on mount
+  useEffect(() => {
+    setLoading(true);
+    callGemini(SYSTEM_PROMPT).then(text => {
+      setMessages([{ role: 'model', content: text.trim() }]);
+      setQuestionCount(1);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading, reflection]);
+
+  const handleAnswer = async () => {
+    const trimmed = answer.trim();
+    if (!trimmed || loading) return;
+    const newMessages: Message[] = [...messages, { role: 'user', content: trimmed }];
+    setMessages(newMessages);
+    setAnswer('');
+    setLoading(true);
+
+    try {
+      if (questionCount >= 10) {
+        // Get closing reflection
+        const reflectionText = await callGemini(
+          buildPrompt(newMessages, 'Now write your closing reflection about what this poem is really about.')
+        );
+        setReflection(reflectionText.trim());
+      } else {
+        const nextQ = await callGemini(
+          buildPrompt(newMessages, `Ask question ${questionCount + 1} of 10. Just the question.`)
+        );
+        setMessages(prev => [...prev, { role: 'model', content: nextQ.trim() }]);
+        setQuestionCount(q => q + 1);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showInput = !reflection && questionCount > 0;
+
+  return (
+    <div style={{ display: 'flex', height: '100%', minHeight: '100vh' }}>
+      {/* Left column — poem */}
+      <div style={{
+        width: '35%', flexShrink: 0, background: '#fdf8f0',
+        borderRight: '1px solid #ede7d9', padding: '2.5rem 2rem',
+        display: 'flex', flexDirection: 'column', overflowY: 'auto',
+      }}>
+        <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9c9080', marginBottom: '8px' }}>
+          reading
+        </div>
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#2e2418', marginBottom: '4px' }}>
+          {poem.title || 'Untitled'}
+        </div>
+        {poem.theme && (
+          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#b87355', marginBottom: '1.5rem' }}>
+            {poem.theme}
+          </div>
+        )}
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: '13px', color: '#3a2e20', lineHeight: 2, flex: 1, whiteSpace: 'pre-wrap' }}>
+          {poem.content}
+        </div>
+        <button
+          onClick={onBack}
+          style={{ marginTop: '2rem', background: 'none', border: 'none', fontSize: '12px', color: '#9c9080', cursor: 'pointer', textAlign: 'left', padding: 0 }}
+        >
+          ← choose another
+        </button>
+      </div>
+
+      {/* Right column — chat */}
+      <div style={{ flex: 1, background: '#faf7f2', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {/* Scrollable chat area */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '2rem 2.5rem 6rem' }}>
+          {/* Progress */}
+          <div style={{ fontSize: '11px', color: '#9c9080', textAlign: 'right', marginBottom: '1.5rem' }}>
+            {questionCount > 0 && !reflection && `Question ${questionCount} of 10`}
+            {reflection && 'Interview complete'}
+          </div>
+
+          {/* Messages */}
+          {messages.map((msg, i) => (
+            <div key={i}>
+              {msg.role === 'model' ? (
+                <div style={{
+                  background: '#fff', border: '1px solid #ede7d9',
+                  borderRadius: '12px 12px 12px 0', padding: '14px 18px',
+                  marginBottom: '8px', fontFamily: 'Georgia, serif',
+                  fontSize: '14px', color: '#2e2418', lineHeight: 1.7,
+                }}>
+                  {msg.content}
+                </div>
+              ) : (
+                <div style={{
+                  fontStyle: 'italic', color: '#6b7f6e', fontSize: '14px',
+                  padding: '4px 0 20px 2px',
+                }}>
+                  {msg.content}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {loading && (
+            <div style={{ fontSize: '20px', color: '#9c9080', letterSpacing: '4px', marginTop: '8px' }}>
+              ...
+            </div>
+          )}
+
+          {/* Closing reflection */}
+          {reflection && (
+            <div style={{
+              background: '#fdf6ef', borderLeft: '4px solid #b87355',
+              borderRadius: '0 12px 12px 12px', padding: '1.5rem 2rem', marginTop: '1rem',
+            }}>
+              <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9c9080', marginBottom: '0.75rem' }}>
+                what your poem is really about
+              </div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '15px', color: '#2e2418', lineHeight: 1.8 }}>
+                {reflection}
+              </div>
+              <button
+                onClick={onBack}
+                style={{ marginTop: '1.25rem', background: 'none', border: 'none', fontSize: '13px', color: '#9c9080', cursor: 'pointer', padding: 0 }}
+              >
+                start over →
+              </button>
+            </div>
+          )}
+
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Input area — fixed at bottom */}
+        {showInput && (
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            padding: '1rem 2.5rem 1.5rem', background: '#faf7f2',
+            borderTop: '1px solid #ede7d9', display: 'flex', gap: '10px',
+          }}>
+            <input
+              type="text"
+              placeholder="Your answer..."
+              value={answer}
+              onChange={e => setAnswer(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAnswer()}
+              style={{
+                flex: 1, background: '#fff', border: '1px solid #ede7d9',
+                borderRadius: '10px', padding: '10px 16px', fontSize: '14px',
+                color: '#3a2e20', outline: 'none', fontFamily: 'system-ui',
+              }}
+            />
+            <button
+              onClick={handleAnswer}
+              disabled={loading || !answer.trim()}
+              style={{
+                background: '#b87355', color: '#fff', border: 'none',
+                borderRadius: '10px', padding: '10px 20px', fontSize: '14px',
+                cursor: loading ? 'wait' : 'pointer', fontFamily: 'system-ui',
+                opacity: loading || !answer.trim() ? 0.6 : 1,
+              }}
+            >
+              Answer →
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
