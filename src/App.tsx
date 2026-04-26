@@ -1010,7 +1010,7 @@ function WritingInsightsView({ poems }: { poems: Poem[] }) {
 
   const allText = poems.map(p => p.content).join(' ').toLowerCase();
   const words: string[] = allText.match(/\b\w+\b/g) || [];
-  const commonWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'is', 'of', 'for', 'with', 'my', 'i', 'you', 'it'];
+  const commonWords = ['the','a','an','and','or','but','in','on','at','to','is','of','for','with','my','i','you','it','me','he','she','we','they','them','their','this','that','these','those','was','are','be','been','being','have','has','had','do','did','does','from','by','as','so','if','not','no','up','out','its','our','your','his','her','all','just','like','when','what','who','how','then','than','into','over','also','back','only','about','will','would','could','should','there','here','now','get','got','go','gone','said','say','know','think','see','come','came','take','make','made'];
   const wordFreq = words.reduce((acc: Record<string, number>, w) => {
     if (w.length > 3 && !commonWords.includes(w)) {
       acc[w] = (acc[w] || 0) + 1;
