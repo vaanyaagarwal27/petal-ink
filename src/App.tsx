@@ -1221,13 +1221,6 @@ ${poem.content}`,
     <div className="p-8 max-w-3xl mx-auto">
       <h2 className="text-3xl font-serif text-lilac-800 mb-8">Writing Insights</h2>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <StatCard label="Total poems" value={String(totalPoems)} />
-        <StatCard label="Unique themes" value={String(uniqueThemes)} />
-        <StatCard label="Most used word" value={mostUsedWord} />
-      </div>
-
       {/* Observation */}
       {observationSentence && (
         <p className="mb-10 font-serif" style={{ color: '#2e3d30', fontSize: '15px' }}>
@@ -1248,10 +1241,7 @@ ${poem.content}`,
           )}
           {bestLine && !bestLineLoading && (
             <div className="pl-6" style={{ borderLeft: '4px solid #b87355' }}>
-              <p
-                className="text-2xl italic font-serif leading-snug"
-                style={{ color: '#2e3d30' }}
-              >
+              <p className="text-2xl italic font-serif leading-snug" style={{ color: '#2e3d30' }}>
                 {bestLine.line}
               </p>
               <p className="mt-2" style={{ fontSize: '12px', color: '#9c9080' }}>
@@ -1264,54 +1254,6 @@ ${poem.content}`,
           )}
         </section>
       )}
-
-      {/* your themes */}
-      <section className="mb-12">
-        <span style={sectionLabel}>your themes</span>
-        {sortedThemes.length > 0 ? (
-          <div className="space-y-5">
-            {sortedThemes.map(([theme, count]) => (
-              <div key={theme}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-serif text-base" style={{ color: '#2e3d30' }}>{theme}</span>
-                  <span className="text-sm" style={{ color: '#9c9080' }}>{count}</span>
-                </div>
-                <div className="h-1.5 rounded-full" style={{ background: '#ede7d9' }}>
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ background: '#b87355', width: `${(count / poems.length) * 100}%` }}
-                  />
-                </div>
-                <p style={{ fontStyle: 'italic', fontSize: '12px', color: '#9c9080', marginTop: '4px' }}>
-                  {count === 1 ? 'written once' : count === 2 ? 'returning to this' : 'this keeps finding you'}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-slate-400 italic text-sm">Write more to see theme patterns.</p>
-        )}
-      </section>
-
-      {/* words you can't escape */}
-      <section className="mb-12">
-        <span style={sectionLabel}>words you can&rsquo;t escape</span>
-        {topWords.length > 0 ? (
-          <div className="flex flex-wrap" style={{ gap: '12px' }}>
-            {topWords.map(([word], i) => (
-              <span
-                key={word}
-                className={cn('font-serif', i < 3 ? 'text-2xl' : i < 7 ? 'text-lg' : 'text-base')}
-                style={{ color: i < 3 ? '#2e3d30' : i < 7 ? '#6b7f6e' : '#9c9080' }}
-              >
-                {word}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-slate-400 italic text-sm">Vocabulary patterns will appear here.</p>
-        )}
-      </section>
 
       {/* Read my writing */}
       {readMode === 'hidden' && poems.length > 0 && (
@@ -1358,6 +1300,41 @@ ${poem.content}`,
           </div>
         </div>
       )}
+
+      {/* your themes */}
+      <section className="mt-12 mb-12">
+        <span style={sectionLabel}>your themes</span>
+        {sortedThemes.length > 0 ? (
+          <div className="space-y-5">
+            {sortedThemes.map(([theme, count]) => (
+              <div key={theme}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-serif text-base" style={{ color: '#2e3d30' }}>{theme}</span>
+                  <span className="text-sm" style={{ color: '#9c9080' }}>{count}</span>
+                </div>
+                <div className="h-1.5 rounded-full" style={{ background: '#ede7d9' }}>
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ background: '#b87355', width: `${(count / poems.length) * 100}%` }}
+                  />
+                </div>
+                <p style={{ fontStyle: 'italic', fontSize: '12px', color: '#9c9080', marginTop: '4px' }}>
+                  {count === 1 ? 'written once' : count === 2 ? 'returning to this' : 'this keeps finding you'}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-slate-400 italic text-sm">Write more to see theme patterns.</p>
+        )}
+      </section>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-3 gap-4">
+        <StatCard label="Total poems" value={String(totalPoems)} />
+        <StatCard label="Unique themes" value={String(uniqueThemes)} />
+        <StatCard label="Most used word" value={mostUsedWord} />
+      </div>
     </div>
   );
 }
