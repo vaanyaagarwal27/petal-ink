@@ -552,11 +552,9 @@ function NewPoemView({ poem, onSave, initialTheme }: { poem: Poem | null, onSave
     main.scrollTo({ top: Math.max(0, main.scrollTop + cursorRelTop - main.clientHeight / 2), behavior: 'smooth' });
   };
 
-  const applyFormat = (prefix: string, suffix: string) => {
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return;
-    const selected = sel.toString();
-    document.execCommand('insertText', false, prefix + selected + suffix);
+  const applyFormat = (command: 'bold' | 'italic' | 'underline') => {
+    editorRef.current?.focus();
+    document.execCommand(command, false);
   };
 
   const handleSave = () => {
@@ -611,14 +609,14 @@ function NewPoemView({ poem, onSave, initialTheme }: { poem: Poem | null, onSave
         {/* Formatting toolbar */}
         <div style={{ display: 'inline-flex', gap: '4px', background: '#e4d8c0', borderRadius: '8px', padding: '4px 8px', marginBottom: '16px' }}>
           {([
-            { label: 'B', extra: { fontWeight: 'bold' as const },  prefix: '**',  suffix: '**'  },
-            { label: 'I', extra: { fontStyle: 'italic' as const },  prefix: '_',   suffix: '_'   },
-            { label: 'U', extra: { textDecoration: 'underline' as const }, prefix: '<u>', suffix: '</u>' },
-          ] as const).map(({ label, extra, prefix, suffix }) => (
+            { label: 'B', extra: { fontWeight: 'bold' as const },  command: 'bold' as const  },
+            { label: 'I', extra: { fontStyle: 'italic' as const },  command: 'italic' as const },
+            { label: 'U', extra: { textDecoration: 'underline' as const }, command: 'underline' as const },
+          ] as const).map(({ label, extra, command }) => (
             <button
               key={label}
               onMouseDown={e => e.preventDefault()}
-              onClick={() => applyFormat(prefix, suffix)}
+              onClick={() => applyFormat(command)}
               style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#806040', fontFamily: 'Georgia, serif', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', ...extra }}
             >
               {label}
@@ -896,6 +894,32 @@ Generate a creative spark to help them begin writing. Be specific to what they'v
 }
 
 function SavedPoemsView({ poems, onDelete, onEdit }: { poems: Poem[], onDelete: (id: string) => void, onEdit: (poem: Poem) => void }) {
+  const [readingPoem, setReadingPoem] = useState<Poem | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  if (readingPoem) {
+    return (
+      <div className="p-8 max-w-2xl mx-auto">
+        <button
+          onClick={() => setReadingPoem(null)}
+          className="flex items-center gap-2 text-lilac-400 hover:text-lilac-600 transition-colors mb-10 text-sm"
+        >
+          ← back to collection
+        </button>
+        <h1 className="text-4xl font-serif text-slate-800 mb-3">{readingPoem.title || 'Untitled'}</h1>
+        {readingPoem.theme && (
+          <p className="text-sm text-lilac-400 italic mb-10">#{readingPoem.theme}</p>
+        )}
+        <div className="font-serif text-slate-700 text-lg leading-loose whitespace-pre-wrap">
+          {readingPoem.content}
+        </div>
+        <div className="mt-12 pt-6 border-t border-lilac-100 text-[11px] text-slate-400 uppercase tracking-widest">
+          Written {new Date(readingPoem.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <h2 className="text-3xl font-serif text-lilac-800 mb-8">Your Poetry Collection</h2>
@@ -911,15 +935,30 @@ function SavedPoemsView({ poems, onDelete, onEdit }: { poems: Poem[], onDelete: 
             <motion.div
               key={poem.id}
               layout
-              className="bg-white rounded-2xl p-6 shadow-sm border border-lilac-200 hover:shadow-md transition-shadow flex flex-col h-64"
+              onClick={() => setReadingPoem(poem)}
+              onMouseEnter={() => setHoveredId(poem.id)}
+              onMouseLeave={() => setHoveredId(null)}
+              style={{
+                transition: 'transform 0.18s, box-shadow 0.18s',
+                transform: hoveredId === poem.id ? 'translateY(-4px)' : 'translateY(0)',
+                boxShadow: hoveredId === poem.id ? '0 8px 24px rgba(0,0,0,0.08)' : '0 1px 3px rgba(0,0,0,0.04)',
+                cursor: 'pointer',
+              }}
+              className="bg-white rounded-2xl p-6 border border-lilac-200 flex flex-col h-64"
             >
               <div className="flex justify-between items-start mb-2">
                 <h3 className="text-xl font-serif text-slate-800 truncate pr-4">{poem.title || 'Untitled'}</h3>
                 <div className="flex gap-1">
-                  <button onClick={() => onEdit(poem)} className="p-2 text-slate-400 hover:text-lilac-600 transition-colors">
+                  <button
+                    onClick={e => { e.stopPropagation(); onEdit(poem); }}
+                    className="p-2 text-slate-400 hover:text-lilac-600 transition-colors"
+                  >
                     <Edit3 size={16} />
                   </button>
-                  <button onClick={() => onDelete(poem.id)} className="p-2 text-slate-400 hover:text-red-400 transition-colors">
+                  <button
+                    onClick={e => { e.stopPropagation(); onDelete(poem.id); }}
+                    className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                  >
                     <Trash2 size={16} />
                   </button>
                 </div>
